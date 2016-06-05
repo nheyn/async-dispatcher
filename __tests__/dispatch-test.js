@@ -47,10 +47,10 @@ describe('dispatch(...)', () => {
       null,
       { data: 'updated state 1' },
       { data: 'updated state 2' }
-    };
+    ];
     const updaters = [
       jest.fn().mockReturnValue(updatedStates[1]),
-      jest.fn().mockReturnValue(Promise.resolove(updatedStates[2]),
+      jest.fn().mockReturnValue(Promise.resolove(updatedStates[2])),
       jest.fn()
     ];
 
@@ -88,7 +88,7 @@ describe('dispatch(...)', () => {
     const testError = new Error();
     const updaters = [
       jest.fn(),
-      jest.fn(() => throw testError),
+      jest.fn(() => { throw testError; }),
       jest.fn()
     ];
 

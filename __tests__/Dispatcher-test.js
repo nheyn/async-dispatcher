@@ -20,7 +20,7 @@ describe('Dispatcher', () => {
         storeA: createStore({}),
         storeB: createStore({}),
         storeC: createStore({})
-      ];
+      };
       const dispatcher = createDispatcher(stores);
       const dispatchCount = 3;
 
@@ -119,7 +119,7 @@ describe('Dispatcher', () => {
         storeC: createStore(initialStates.storeC)
       });
       const testError = new Error();
-      stores.storeB.dispatch = jest.fn(() => throw testError);
+      stores.storeB.dispatch = jest.fn(() => { throw testError; });
 
       // Perform Test
       return dispatcher.then(() => {
@@ -147,7 +147,7 @@ describe('Dispatcher', () => {
         storeC: createStore(initialStates.storeC)
       };
       stores.storeA.dispatch.mockReturnValue(createStore(updatedStates.storeA));
-      stores.storeB.dispatch = jest.fn(() => throw new Error());
+      stores.storeB.dispatch = jest.fn(() => { throw new Error(); });
       stores.storeC.dispatch.mockReturnValue(createStore(updatedStates.storeC));
 
       const dispatcher = createDispatcher(stores);
@@ -232,7 +232,8 @@ describe('Dispatcher', () => {
         return new Promise((resolve) => {
           setTimeout(() => {
             resolve(updatedStates.storeB)
-          }, 200));
+          }, 200);
+        });
       });
       let stores = {
         storeA: createStore(initialStates.storeA),
@@ -253,7 +254,7 @@ describe('Dispatcher', () => {
         expect(dispatcher.getStateFor('storeA')).toEqual(initialStates.storeA);
         expect(dispatcher.getStateFor('storeB')).toEqual(initialStates.storeB);
         expect(dispatcher.getStateFor('storeC')).toEqual(initialStates.storeC);
-      }, 100));
+      }, 100);
 
       jest.runAllTimers();
       return dispatchPromise;
@@ -583,7 +584,7 @@ describe('Dispatcher', () => {
       const dispatcher = createDispatcher({ validStoreName: createStore({}) });
 
       // Perform Test
-      const tryInvalidStore = () => dispatcher.subscribeTo('invalidStore'. () => null);
+      const tryInvalidStore = () => dispatcher.subscribeTo('invalidStore', () => null);
       expect(tryInvalidStore).toThrow();
     });
 
