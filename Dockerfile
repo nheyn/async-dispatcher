@@ -22,4 +22,4 @@ RUN chown -R node:node ./*
 # Run test
 USER node
 RUN npm install
-CMD npm run check
+CMD npm run test
