@@ -11,11 +11,13 @@
   "devDependencies": {
     "babel-cli": "^6.9.0",
     "babel-jest": "^12.1.0",
+    "babel-plugin-transform-flow-strip-types": "^6.8.0",
+    "babel-polyfill": "^6.9.1",
     "babel-preset-es2015": "^6.9.0",
     "babel-preset-stage-0": "^6.5.0",
     "flow-bin": "^0.26.0",
     "iflow-immutable": "^1.0.32",
-    "jest-cli": "^0.8.2"
+    "jest-cli": "^12.1.1"
   },
   "scripts": {
     "flow": "flow check",
@@ -28,13 +30,6 @@
     "build": "npm run babel",
 
     "prepublish": "npm run test && npm run build"
-  },
-  "jest": {
-    "scriptPreprocessor": "<rootDir>/node_modules/babel-jest",
-    "unmockedModulePathPatterns": [
-      "immutable",
-      "kefir"
-    ]
   },
   "license": "MIT"
 }

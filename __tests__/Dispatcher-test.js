@@ -12,7 +12,7 @@ function createStore(initialState) {
   return store;
 }
 
-describe('Dispatcher', () => {
+xdescribe('Dispatcher', () => {
   describe('dispatch(...)', () => {
     pit('calls dispatch in each store, every time it is called', () => {
       // Test Data

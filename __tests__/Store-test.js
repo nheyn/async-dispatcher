@@ -6,7 +6,7 @@ function createStore(initialState, dispatch) {
   return new Store(initialState, dispatch? dispatch: jest.fn().mockReturnValue(initialState));
 }
 
-describe('Store', () => {
+xdescribe('Store', () => {
   describe('register(...)', () => {
     pit('will return a new store, with the given function registered as an updater', () => {
       // Test Data

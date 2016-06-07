@@ -2,7 +2,7 @@ jest.unmock('../src/Store');
 
 import dispatch from '../src/dispatch';
 
-describe('dispatch(...)', () => {
+xdescribe('dispatch(...)', () => {
   pit('will call each updater, with the given action', () => {
     // Test Data
     const action = { type: 'TEST_ACTION' };
