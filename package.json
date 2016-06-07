@@ -31,5 +31,11 @@
 
     "prepublish": "npm run test && npm run build"
   },
+  "jest": {
+    "unmockedModulePathPatterns": [
+      "immutable",
+      "kefir"
+    ]
+  },
   "license": "MIT"
 }
