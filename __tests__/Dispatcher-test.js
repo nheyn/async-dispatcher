@@ -131,6 +131,38 @@ describe('Dispatcher', () => {
         }
       });
     });
+
+    pit('will queue each action passed in, if another action is currently being dispatched', () => {
+      // Test Data
+      const actions = [
+        { type: 'TEST_ACTION', index: 0 },
+        { type: 'TEST_ACTION', index: 1 },
+        { type: 'TEST_ACTION', index: 2 }
+      ];
+      let store = createStore({});
+      store.dispatch.mockReturnValue(new Promise((resolve) => {
+        setTimeout(() => {
+          resolve({});
+        }, 100);
+      }));
+      const dispatcher = createDispatcher({ store });
+
+      // Perform Test
+      let dispatchPromise = null;
+      actions.forEach((action) => {
+        dispatchPromise = dispatcher.dispatch(action);
+      });
+
+      jest.runAllTimers();
+      return dispatchPromise.then(() => {
+        const { calls } = store.dispatch.mock;
+        expect(calls.length).toEqual(actions.length);
+
+        calls.forEach(([ currAction ], index) => {
+          expect(currAction).toEqual(actions[index]);
+        });
+      });
+    });
   });
 
   describe('getStateFor(...)', () => {
