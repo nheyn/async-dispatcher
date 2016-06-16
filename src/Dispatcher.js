@@ -2,64 +2,90 @@
  * @flow
  */
 import Immutable from 'immutable';
-import Kefir from 'kefir';
 
 import type Store from './Store';
 
 type StoresMap = Immutable.Map<string, Store<any>>;
-type StoreUpdateSpec<S> = {
-  storeName: string,
-  store: Store<S>,
-  action: Action
-};
+type SubscriberMap = Immutable.Map<string, Immutable.Set<Subscriber>>;;
 
 /**
- * A class that contains a group of stores that should all recive the same actions.
+ * A class that contains a group of stores that should all receive the same actions.
  */
 export default class Dispatcher {
   _stores: StoresMap;
-  _onDispatch: (action: Action) => void;
-  _onUpdate: (stores: StoresMap) => void;
-  _updateStream: Kefir.Stream<StoreUpdateSpec>;
-  _subscribers: Immutable.Map<string, Immutable.Set<Subscriber>>;
+  _subscribers: SubscriberMap;
+  _isDispatching: bool;
 
   /**
    * Constructor for the Dispatcher.
+   *
+   * @param initialStores       {Immutable.Map<Store>}                          The initial stores
+   * @param initialSubscribers  {Immutable.Map<Immutable.Set<(any) => void>>}   The initial subscribers
    */
-  constructor(initialStores: StoresMap) {
+  constructor(initialStores: StoresMap, initialSubscribers: SubscriberMap) {
     this._stores = initialStores;
+    this._subscribers = initialSubscribers;
+    this._isDispatching = false;
+  }
 
-    this._onDispatch =  () => { throw new Error('Dispatch called before initiation finished'); };
-    this._onUpdate =    () => { throw new Error('onUpdate called before initiation finished'); };
+  /**
+   * Create a new Dispatcher.
+   *
+   * @param initialStores {Object<Store>} The initial stores
+   *
+   * @return              {Dispatcher}    The dispatcher using the given stores
+   */
+  static createDispatcher(initialStores: {[key: string]: Store<any>}): Dispatcher {
+    const initialStoreMap = Immutable.Map(initialStores);
 
-    this._updateStream = this._createUpdateStream(initialStores);
-
-    this._subscribers = initialStores.map(() => Immutable.Set());
+    return new Dispatcher(
+      initialStoreMap,
+      initialStoreMap.map(() => Immutable.Set())
+    );
   }
 
   /**
    * Dispatch the given action to all of the stores.
    *
-   * @param action  {Object}          The action to dispatch
+   * @param action  {Object}                  The action to dispatch
    *
-   * @return      {Promise<{string: any}>}  The states after the dispatch is finished
+   * @return        {Promise<{string: any}>}  The states after the dispatch is finished
    */
   dispatch(action: Action): Promise<Dispatcher> {
-    this._onDispatch(action);
+    if(this._isDispatching) throw new Error('NYI: multiple dispatches at once');
+    this._isDispatching = true;
 
-    // Combine store updates for current action
-    return this._updateStream
-                .filter(({ action: currAction }) => action === currAction)
-                .take(this._stores.count())
-                .scan((stores, { storeName, store }) => stores.set(storeName, store), Immutable.Map())
-                .last() // Make sure map is only called with the final value
-                .map((stores) => {
-                  this._onUpdate(stores);
-                  this._stores = stores;
+    const updatedStorePromises = this._stores.map((store) => {
+      return store.dispatch(action);
+    });
 
-                  return this;
-                })
-                .toPromise();
+    // Turn Map<string, Promise<Store>> => Promise<Map<string, Store>>
+    let keys = [];
+    let storePromiseArray = [];
+    const storePromisesObject = updatedStorePromises.toObject()
+    for(let storeName in storePromisesObject) {
+      const storePromise = storePromisesObject[storeName];
+
+      keys.push(storeName);
+      storePromiseArray.push(storePromise);
+    }
+
+    const storesPromise = Promise.all(storePromiseArray).then((storeArray) => {
+      let storesObject = {};
+      keys.forEach((storeName, i) => {
+        storesObject[storeName] = storeArray[i];
+      });
+
+      return Immutable.Map(storesObject);
+    });
+
+    // Save updated state
+    return storesPromise.then((stores) => {
+      this._setStores(stores);
+      this._isDispatching = false;
+
+      return this;
+    });
   }
 
   /**
@@ -67,7 +93,7 @@ export default class Dispatcher {
    *
    * @param storeName {string}  The name of the store to get the state of
    *
-   * @return      {any}   The state of the given store
+   * @return          {any}   The state of the given store
    */
   getStateFor(storeName: string): any {
     if(!this._stores.has(storeName)) {
@@ -80,17 +106,18 @@ export default class Dispatcher {
   /**
    * Add a new subscriber to the given Store.
    *
-   * @param storeName {string}      The store to subscribe to
-   * @param subscriber {(any) => void}  The function to call, with the state, after each
+   * @param storeName   {string}        The store to subscribe to
+   * @param subscriber  {(any) => void} The function to call, with the state, after each
    *                    dispatch
    *
-   * @return      {() => void}    The function to call to unsubscibe
+   * @return            {() => void}    The function to call to unsubscibe
    */
-  subscribeTo(storeName: string, subscriber: Subscriber): UnsubscibeFunc {
+  subscribeTo(storeName: string, subscriber: Subscriber<any>): UnsubscibeFunc {
     // Check inputs
+    if(typeof subscriber !== 'function') throw new Error('Cannot subscribe: subscriber must be a function');
     if(typeof storeName !== 'string') throw new Error('Cannot subscribe: store name must be a string');
     if(!this._subscribers.has(storeName)) {
-      throw new Error('Cannot subscribe: store(${storeName}) dose not exist');
+      throw new Error(`Cannot subscribe: "${storeName}" dose not exist`);
     }
 
     // Subscribe
@@ -112,38 +139,25 @@ export default class Dispatcher {
     };
   }
 
-  _createUpdateStream(storesMap: StoresMap): Kefir.Stream<StoreUpdateSpec> {
-    // Get actions
-    const actionStream = Kefir.stream((emitter) => {
-      this._onDispatch = (action) => {
-        emitter.emit(action);
-      };
-    });
+  _setStores(stores: Immutable.Map<string, Store<any>>) {
+    // Save stores
+    this._stores = stores;
 
-    // Get stores
-    const storesStream = Kefir.concat([
-      Kefir.constant(this._stores),
-      Kefir.stream((emitter) => {
-        this._onUpdate = (stores) => {
-          emitter.emit(stores);
-        };
-      })
-    ]);
+    // Call subscribers
+    this._subscribers.forEach((storeSubscribers, storeName) => {
+      if(storeSubscribers.count() === 0)  return;
 
-    // Perform actions
-    return actionStream.flatMapConcat((action) => {
-      let newStoresStreams = [];
-      this._stores.forEach((store, storeName) => {
-        // Call dispatch(...)
-        const storePromise = store.dispatch(action);
-
-        // Include data about current dispatch in stream
-        newStoresStreams.push(Kefir.fromPromise(storePromise).map((store) => {
-          return { storeName, store, action };
-        }));
+      const storeState = this.getStateFor(storeName);
+      storeSubscribers.forEach((storeSubscriber) => {
+        storeSubscriber(storeState);
       });
-
-      return Kefir.merge(newStoresStreams);   //TODO, find way to close when dispatch is done
     });
   }
+}
+
+/**
+ * See static method Dispatcher.createDispatcher(...)
+ */
+export function createDispatcher(initialStores: {[key: string]: Store<any>}): Dispatcher {
+  return Dispatcher.createDispatcher(initialStores);
 }

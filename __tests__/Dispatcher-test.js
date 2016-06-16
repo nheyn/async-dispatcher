@@ -1,7 +1,8 @@
 jest.unmock('../src/Dispatcher');
 
+import Immutable from 'immutable';
 import Store from '../src/Store';
-import { createDispatcher } from '../src/Dispatcher';
+import Dispatcher, { createDispatcher } from '../src/Dispatcher';
 
 function createStore(initialState) {
   const store = new Store(initialState);
@@ -12,7 +13,7 @@ function createStore(initialState) {
   return store;
 }
 
-xdescribe('Dispatcher', () => {
+describe('Dispatcher', () => {
   describe('dispatch(...)', () => {
     pit('calls dispatch in each store, every time it is called', () => {
       // Test Data
@@ -25,14 +26,17 @@ xdescribe('Dispatcher', () => {
       const dispatchCount = 3;
 
       // Perform Test
-      let dispatchPromise = null;
+      let dispatchPromise = Promise.resolve(dispatcher);
       for(let i=0; i<dispatchCount; i++) {
-        dispatchPromise = dispatcher.dispatch({});
+        // Call dispatch after last dispatch is finished
+        dispatchPromise = dispatchPromise.then((dispatcher) => {
+          return dispatcher.dispatch({})
+        });
       }
 
       return dispatchPromise.then(() => {
         for(let storeName in stores) {
-          const { calls } = stores[storeName].mock;
+          const { calls } = stores[storeName].dispatch.mock;
 
           expect(calls.length).toBe(dispatchCount);
         }
@@ -52,7 +56,7 @@ xdescribe('Dispatcher', () => {
       // Perform Test
       return dispatcher.dispatch(action).then(() => {
         for(let storeName in stores) {
-          const { calls } = stores[storeName].mock;
+          const { calls } = stores[storeName].dispatch.mock;
 
           expect(calls.length).toBe(1);
           expect(calls[0][0]).toBe(action);
@@ -60,49 +64,13 @@ xdescribe('Dispatcher', () => {
       });
     });
 
-    pit('returns a Promise with updated states for all the stores', () => {
+    pit('returns a Promise with the Dispatcher', () => {
       // Test Data
-      const states = {
-        storeA: { data: 'a' },
-        storeB: { data: 'b' },
-        storeC: { data: 'c' }
-      };
-      const dispatcher = createDispatcher({
-        storeA: createStore(states.storeA),
-        storeB: createStore(states.storeB),
-        storeC: createStore(states.storeC)
-      });
+      const dispatcher = createDispatcher({ });
 
       // Perform Test
-      return dispatcher.dispatch(action).then((newStates) => {
-        expect(Object.keys(newStates)).Equal(Object.keys(sates));
-
-        for(let storeName in newStates) {
-          expect(newStates).toEqual(states[storeName]);
-        }
-      });
-    });
-
-    it('throws an error if the action is not a basic javascript object', () => {
-      // Test Data
-      const dispatcher = createDispatcher({});
-      const actions = [
-        'not an object',
-        1,
-        null,
-        undefined,
-        true,
-        function() { },
-        { error: function() {} }
-      ];
-
-      // Preform Tests
-      actions.forEach((action) => {
-        const performDispatch = () => {
-          dispatcher.dispatch(action);
-        };
-
-        expect(performDispatch).toThrow();
+      return dispatcher.dispatch({}).then((returnedDispatcher) => {
+        expect(returnedDispatcher).toBe(dispatcher);
       });
     });
 
@@ -113,16 +81,17 @@ xdescribe('Dispatcher', () => {
         storeB: { data: 'b' },
         storeC: { data: 'c' }
       };
-      const dispatcher = createDispatcher({
+      const stores = {
         storeA: createStore(initialStates.storeA),
         storeB: createStore(initialStates.storeB),
         storeC: createStore(initialStates.storeC)
-      });
+      };
+      const dispatcher = createDispatcher(stores);
       const testError = new Error();
-      stores.storeB.dispatch = jest.fn(() => { throw testError; });
+      stores.storeB.dispatch = jest.fn().mockImplementation(() => Promise.reject(testError));
 
       // Perform Test
-      return dispatcher.then(() => {
+      return dispatcher.dispatch({}).then(() => {
         expect('not').toBe('called');
       }).catch((err) => {
         expect(err).toBe(testError);
@@ -147,13 +116,13 @@ xdescribe('Dispatcher', () => {
         storeC: createStore(initialStates.storeC)
       };
       stores.storeA.dispatch.mockReturnValue(createStore(updatedStates.storeA));
-      stores.storeB.dispatch = jest.fn(() => { throw new Error(); });
+      stores.storeB.dispatch.mockReturnValue(Promise.resolve(new Error()));
       stores.storeC.dispatch.mockReturnValue(createStore(updatedStates.storeC));
 
       const dispatcher = createDispatcher(stores);
 
       // Perform Test
-      return dispatcher.catch(() => {
+      return dispatcher.dispatch({}).catch(() => {
         for(let storeName in stores) {
           const initialState = initialStates[storeName];
           const currState = dispatcher.getStateFor(storeName);
@@ -217,7 +186,7 @@ xdescribe('Dispatcher', () => {
 
     pit('returns the initial states for each individual stores, during a dispatch', () => {
       // Test Data
-      const initialState = {
+      const initialStates = {
         storeA: { data: 'a', state: 'initial' },
         storeB: { data: 'b', state: 'initial' },
         storeC: { data: 'c', state: 'initial' }
@@ -227,7 +196,7 @@ xdescribe('Dispatcher', () => {
         storeB: { data: 'b', state: 'wrong' },
         storeC: { data: 'c', state: 'wrong' }
       };
-      let storeB = createStore(initialState.storeB);
+      let storeB = createStore(initialStates.storeB);
       storeB.dispatch = jest.fn(() => {
         return new Promise((resolve) => {
           setTimeout(() => {
@@ -289,140 +258,10 @@ xdescribe('Dispatcher', () => {
     });
   });
 
-  describe('subscribeToAll(...)', () => {
-    pit('call the given functions every time a store is updated', () => {
-      // Test Data
-      const totalDispatchCalls = 3;
-      const subscribers = [
-        jest.fn(),
-        jest.fn(),
-        jest.fn()
-      ];
-      const dispatcher = createDispatcher({
-        storeA: createStore({}),
-        storeB: createStore({}),
-        storeC: createStore({})
-      });
-      let count = 0;  // NOTE, updating state, otherwise subscribers will not be called
-      stores.storeA.getState.mockReturnValue({ count });
-      stores.storeB.getState.mockReturnValue({ count });
-      stores.storeC.getState.mockReturnValue({ count });
-      subscribers.forEach((subscriber) => {
-        dispatcher.subscribeToAll(subscriber);
-      });
-
-      // Performs Test
-      let dispatchPromise = null;
-      for(let i=0; i<totalDispatchCalls; i++) {
-        dispatchPromise = dispatcher.dispatch({});
-      }
-
-      return dispatchPromise.then(() => {
-        subscribers.forEach((subscriber) => {
-          const { calls } = subscriber.mock;
-
-          expect(calls.length).toBe(totalDispatchCalls);
-        });
-      });
-    });
-
-    it('call the given functions with the updated states', () => {
-      // Test Data
-      const subscribers = [
-        jest.fn(),
-        jest.fn(),
-        jest.fn()
-      ];
-      const initialStates = {
-        storeA: { data: 'a', state: 'initial' },
-        storeB: { data: 'b', state: 'initial' },
-        storeC: { data: 'c', state: 'initial' }
-      };
-      const updatedStates = {
-        storeA: { data: 'a', state: 'updated' },
-        storeB: { data: 'b', state: 'updated' },
-        storeC: { data: 'c', state: 'updated' }
-      };
-      let stores = {
-        storeA: createStore(initialStates.storeA),
-        storeB: createStore(initialStates.storeB),
-        storeC: createStore(initialStates.storeC)
-      };
-      stores.storeA.dispatch.mockReturnValue(createStore(updatedStates.storeA));
-      stores.storeB.dispatch.mockReturnValue(createStore(updatedStates.storeB));
-      stores.storeC.dispatch.mockReturnValue(createStore(updatedStates.storeC));
-      let dispatcher = createDispatcher(stores);
-      subscribers.forEach((subscriber) => {
-        dispatcher.subscribeToAll(subscriber);
-      });
-
-      // Perform Test
-      return dispatcher.dispatch({}).then(() => {
-        subscribers.forEach((subscriber) => {
-          const { calls } = subscribers.mock;
-
-          expect(calls.length).toBe(1);
-          expect(calls[0][1]).toEqual(updatedStates);
-        });
-      });
-    });
-
-    pit('does not call the the given function after a dispatch, if no stores state changes', () => {
-      // Test Data
-      const subscribers = [
-        jest.fn(),
-        jest.fn(),
-        jest.fn()
-      ];
-      const initialStates = {
-        storeA: { data: 'a' },
-        storeB: { data: 'b' },
-        storeC: { data: 'c' }
-      };
-      const dispatcher = createDispatcher({
-        storeA: createStore(initialStates.storeA),
-        storeB: createStore(initialStates.storeB),
-        storeC: createStore(initialStates.storeC)
-      });
-      subscribers.forEach((subscriber) => {
-        dispatcher.subscribeToAll(subscriber);
-      });
-
-      // Perform Test
-      return dispatcher.dispatch({}).then(() => {
-        subscribers.forEach((subscriber) => {
-          const { calls } = subscribers.mock;
-
-          expect(calls.length).toBe(0);
-        });
-      });
-    });
-
-    it('throws an error if a non function is given as the subscriber', () => {
-      // Test Data
-      const updaters = [
-        'not a function',
-        1,
-        null,
-        undefined,
-        true,
-        {}
-      ];
-      const dispatcher = createDispatcher({});
-
-      // Performs Test
-      updaters.forEach((updater) => {
-        const performSubscribe = () => dispatcher.subscribeToAll(updater);
-
-        expect(performSubscribe).toThrow();
-      });
-    });
-  });
-
   describe('subscribeTo(...)', () => {
     it('call the given functions every time the given store is updated', () => {
       // Test Data
-      const totalDispatchCalls = 3;
+      const dispatchCount = 3;
       const subscribers = {
         storeA: [ jest.fn(), jest.fn(), jest.fn() ],
         storeB: [ jest.fn(), jest.fn(), jest.fn() ],
@@ -433,10 +272,6 @@ xdescribe('Dispatcher', () => {
         storeB: createStore({}),
         storeC: createStore({})
       });
-      let count = 0;  // NOTE, updating state, otherwise subscribers will not be called
-      stores.storeA.getState.mockReturnValue({ count });
-      stores.storeB.getState.mockReturnValue({ count });
-      stores.storeC.getState.mockReturnValue({ count });
       subscribers.storeA.forEach((subscriber) => {
         dispatcher.subscribeTo('storeA', subscriber);
       });
@@ -448,26 +283,29 @@ xdescribe('Dispatcher', () => {
       });
 
       // Performs Test
-      let dispatchPromise = null;
-      for(let i=0; i<totalDispatchCalls; i++) {
-        dispatchPromise = dispatcher.dispatch({});
+      let dispatchPromise = Promise.resolve(dispatcher);
+      for(let i=0; i<dispatchCount; i++) {
+        // Call dispatch after last dispatch is finished
+        dispatchPromise = dispatchPromise.then((dispatcher) => {
+          return dispatcher.dispatch({})
+        });
       }
 
       return dispatchPromise.then(() => {
         subscribers.storeA.forEach((subscriber) => {
           const { calls } = subscriber.mock;
 
-          expect(calls.length).toBe(totalDispatchCalls);
+          expect(calls.length).toBe(dispatchCount);
         });
         subscribers.storeB.forEach((subscriber) => {
           const { calls } = subscriber.mock;
 
-          expect(calls.length).toBe(totalDispatchCalls);
+          expect(calls.length).toBe(dispatchCount);
         });
         subscribers.storeC.forEach((subscriber) => {
           const { calls } = subscriber.mock;
 
-          expect(calls.length).toBe(totalDispatchCalls);
+          expect(calls.length).toBe(dispatchCount);
         });
       });
     });
@@ -513,68 +351,26 @@ xdescribe('Dispatcher', () => {
       return dispatcher.dispatch({}).then(() => {
         subscribers.storeA.forEach((subscriber) => {
           const { calls } = subscriber.mock;
-
           expect(calls.length).toBe(1);
-          expect(calls[0][1]).toEqual(updatedStates);
+
+          const [ currUpdatedState ] = calls[0];
+          expect(currUpdatedState).toEqual(updatedStates.storeA);
         });
 
         subscribers.storeB.forEach((subscriber) => {
           const { calls } = subscriber.mock;
-
           expect(calls.length).toBe(1);
-          expect(calls[0][1]).toEqual(updatedStates);
+
+          const [ currUpdatedState ] = calls[0];
+          expect(currUpdatedState).toEqual(updatedStates.storeB);
         });
 
         subscribers.storeC.forEach((subscriber) => {
           const { calls } = subscriber.mock;
-
           expect(calls.length).toBe(1);
-          expect(calls[0][1]).toEqual(updatedStates);
-        });
-      });
-    });
 
-    it('does not call the the given function after a dispatch, if the given stores state did not change', () => {
-      // Test Data
-      const subscribers = {
-        storeA: [ jest.fn(), jest.fn(), jest.fn() ],
-        storeB: [ jest.fn(), jest.fn(), jest.fn() ],
-        storeC: [ jest.fn(), jest.fn(), jest.fn() ]
-      };
-      const stores = {
-        storeA: createStore(initialStates.storeA),
-        storeB: createStore(initialStates.storeB),
-        storeC: createStore(initialStates.storeC)
-      };
-      let dispatcher = createDispatcher(stores);
-      subscribers.storeA.forEach((subscriber) => {
-        dispatcher.subscribeTo('storeA', subscriber);
-      });
-      subscribers.storeB.forEach((subscriber) => {
-        dispatcher.subscribeTo('storeB', subscriber);
-      });
-      subscribers.storeC.forEach((subscriber) => {
-        dispatcher.subscribeTo('storeC', subscriber);
-      });
-
-      // Perform Test
-      return dispatcher.dispatch({}).then(() => {
-        subscribers.storeA.forEach((subscriber) => {
-          const { calls } = subscriber.mock;
-
-          expect(calls.length).toBe(0);
-        });
-
-        subscribers.storeB.forEach((subscriber) => {
-          const { calls } = subscriber.mock;
-
-          expect(calls.length).toBe(0);
-        });
-
-        subscribers.storeC.forEach((subscriber) => {
-          const { calls } = subscriber.mock;
-
-          expect(calls.length).toBe(0);
+          const [ currUpdatedState ] = calls[0];
+          expect(currUpdatedState).toEqual(updatedStates.storeC);
         });
       });
     });
