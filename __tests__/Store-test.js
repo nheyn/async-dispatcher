@@ -1,30 +1,18 @@
 jest.unmock('../src/Store');
 
 import Immutable from 'immutable';
-import Store from '../src/Store';
+import Store, { createStore } from '../src/Store';
 
-function createStore(args) {
-  if(!args) args = {};
-
-  if(!args.initialState)  args.initialState = {};
-  if(!args.updaters)      args.updaters = Immutable.List();
-  if(!args.dispatch)      args.dispatch = jest.fn().mockReturnValue(Promise.resolve(args.initialState));
-
-  return new Store(
-    args.initialState,
-    args.updaters,
-    args.dispatch
-  );
+function createUpdater(finalState) {
+  return jest.fn().mockImplementation((initialState) => finalState? finalState: initialState);
 }
 
 describe('Store', () => {
   describe('register(...)', () => {
     pit('will return a new store, with the given function registered as an updater', () => {
       // Test Data
-      const updaters = [ jest.fn(), jest.fn(), jest.fn() ];
-
-      let args = {};
-      let store = createStore(args);
+      const updaters = [ createUpdater(), createUpdater(), createUpdater() ];
+      let store = createStore({});
 
       // Perform Tests
       store = store.register(updaters[0]);
@@ -32,18 +20,6 @@ describe('Store', () => {
       store = store.register(updaters[2]);
 
       return store.dispatch({}).then(() => {
-        const { calls } = args.dispatch.mock;
-        expect(calls.length).toBe(1);
-
-        // Get updaters passed to dispatch
-        const [ _, __, dispatchedUpdaters ] = calls[0];
-        expect(dispatchedUpdaters.count()).toBe(updaters.length);
-
-        // Call updaters passed to dispatch
-        dispatchedUpdaters.forEach((dispatchedUpdater) => {
-          dispatchedUpdater();
-        });
-
         // Check the registered updaters where called
         updaters.forEach((updater) => {
           const { calls } = updater.mock;
@@ -76,91 +52,124 @@ describe('Store', () => {
   });
 
   describe('dispatch(...)', () => {
-    pit('will call the dispatch(...) function, with the stores current state', () => {
+    pit('will call each updater, with the given action', () => {
       // Test Data
-      const initialState = { data: 'test state' };
-      const updaters = Immutable.List([ jest.fn(), jest.fn(), jest.fn() ]);
-
-      let args = { initialState, updaters };
-      const store = createStore(args);
-
-      // Perform Tests
-      return store.dispatch({}).then(() => {
-        const { calls } = args.dispatch.mock;
-        expect(calls.length).toBe(1);
-
-        // Get state passed to dispatch
-        const [ currState ] = calls[0];
-
-        // Check initial state is passed to dispatch
-        expect(currState).toBe(initialState);
-      });
-    });
-
-    pit('will call the dispatch(...) function, with the given action', () => {
-      // Test Data
-      const updaters = Immutable.List([ jest.fn(), jest.fn(), jest.fn() ]);
       const action = { type: 'TEST_ACTION' };
-
-      let args = { updaters };
-      const store = createStore(args);
+      const updaters = [
+        createUpdater(),
+        createUpdater(),
+        createUpdater()
+      ];
+      let store = createStore({});
+      for(let i=0; i<updaters.length; i++) {
+        store = store.register(updaters[i]);
+      }
 
       // Perform Tests
       return store.dispatch(action).then(() => {
-        const { calls } = args.dispatch.mock;
-        expect(calls.length).toBe(1);
-
-        // Check correct action was dispatched
-        const dispatchedAction = calls[0][1];
-        expect(dispatchedAction).toEqual(action);
-      });
-    });
-
-    pit('will call the dispatch(...) function, with the registered updaters', () => {
-      // Test Data
-      const updaters = Immutable.List([ jest.fn(), jest.fn(), jest.fn() ]);
-      const dispatchCount = 3;
-
-      const store = createStore({
-        updaters,
-        dispatch(state, action, dispatchedUpdaters) {
-          dispatchedUpdaters.forEach((dispatchedUpdater) => dispatchedUpdater());
-
-          return Promise.resolve(state);
-        }
-      });
-
-      // Perform Tests
-      let storePromise = Promise.resolve(store);
-      for(let i=0; i<dispatchCount; i++) {
-        storePromise = storePromise.then((currStore) => currStore.dispatch({}));
-      }
-
-      return storePromise.then(() => {
         updaters.forEach((updater) => {
           const { calls } = updater.mock;
-          expect(calls.length).toBe(dispatchCount);
+          expect(calls.length).toBe(1);
+
+          const [_, dispatchedAction] = calls[0];
+          expect(dispatchedAction).toBe(action);
         });
       });
     });
 
-    it('will return the updated Store, who\'s state is what was returned from the dispatch(...) function', () => {
+    pit('will call the first updaters, with given the state', () => {
       // Test Data
-      const finalState = { data: 'test state' };
-      const updaters = Immutable.List([ jest.fn(), jest.fn(), jest.fn() ]);
-
-      const store = createStore({
-        updaters,
-        dispatch(state, action, dispatchedUpdaters) {
-          return Promise.resolve(finalState);
-        }
-      });
+      const initialState = { data: 'test state' };
+      const updaters = [
+        createUpdater(),
+        createUpdater(),
+        createUpdater()
+      ];
+      let store = createStore(initialState);
+      for(let i=0; i<updaters.length; i++) {
+        store = store.register(updaters[i]);
+      }
 
       // Perform Tests
-      return store.dispatch({}).then((newStore) => {
-        const newState = newStore.getState();
+      return store.dispatch({ }).then(() => {
+        const { calls } = updaters[0].mock;
+        expect(calls.length).toBe(1);
 
-        expect(newState).toEqual(finalState);
+        const [dispatchedState] = calls[0];
+        expect(dispatchedState).toBe(initialState);
+      });
+    });
+
+    pit('will call all but the first updaters, with the value returned from the previous updater', () => {
+      // Test Data
+      const updatedStates = [
+        null,
+        { data: 'updated state 1' },
+        { data: 'updated state 2' }
+      ];
+      const updaters = [
+        createUpdater(updatedStates[1]),
+        createUpdater(Promise.resolve(updatedStates[2])),
+        createUpdater()
+      ];
+      let store = createStore({});
+      for(let i=0; i<updaters.length; i++) {
+        store = store.register(updaters[i]);
+      }
+
+      // Perform Tests
+      return store.dispatch({ }).then(() => {
+        for(let i=1; i<updaters.length; i++) {
+          const { calls } = updaters[i].mock;
+          expect(calls.length).toBe(1);
+
+          const [dispatchedState] = calls[0];
+          expect(dispatchedState).toBe(updatedStates[i]);
+        }
+      });
+    });
+
+    pit('will return a promise with the state from the final updater', () => {
+      // Test Data
+      const finalState = { data: 'test state' };
+      const updaters = [
+        createUpdater(),
+        createUpdater(),
+        createUpdater(finalState)
+      ];
+      let store = createStore({});
+      for(let i=0; i<updaters.length; i++) {
+        store = store.register(updaters[i]);
+      }
+
+      // Perform Tests
+      return store.dispatch({ }).then((newStore) => {
+        expect(newStore.getState()).toEqual(finalState);
+      });
+    });
+
+    pit('will return a reject promise if an updater throws an error', () => {
+      // Test Data
+      const testError = new Error();
+      const updaters = [
+        createUpdater(),
+        jest.fn(() => { throw testError; }),
+        createUpdater()
+      ];
+      let store = createStore({});
+      for(let i=0; i<updaters.length; i++) {
+        store = store.register(updaters[i]);
+      }
+
+      // Perform Tests
+      return store.dispatch({ }).then(() => {
+        expect('this not').toBe('called');
+      }).catch((err) => {
+        expect(err).toBe(err);
+
+        expect(updaters[0]).toBeCalled();
+        expect(updaters[1]).toBeCalled();
+        expect(updaters[2]).not.toBeCalled();
       });
     });
 
@@ -193,7 +202,7 @@ describe('Store', () => {
     it('will get the initial state, if dispatch was not called', () => {
       // Test Data
       const initialState = { data: 'test state' };
-      const store = createStore({ initialState })
+      const store = createStore(initialState)
 
       // Perform Tests
       expect(store.getState()).toBe(initialState);
@@ -201,14 +210,8 @@ describe('Store', () => {
 
     pit('will get the updated state, if returned from the dispatch(...) method', () => {
       // Test Data
-      const updaters = Immutable.List([ jest.fn() ]);
       const updatedState = { data: 'test state' };
-      const store = createStore({
-        updaters,
-        dispatch() {
-          return Promise.resolve(updatedState);
-        }
-      });
+      const store = createStore({}).register(createUpdater(updatedState));
 
       // Perform Tests
       return store.dispatch({}).then((newStore) => {
