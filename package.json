@@ -32,7 +32,8 @@
   },
   "jest": {
     "unmockedModulePathPatterns": [
-      "immutable"
+      "immutable",
+      ".*/utils/.*"
     ]
   },
   "license": "MIT"
