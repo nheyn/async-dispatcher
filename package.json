@@ -16,9 +16,11 @@
     "babel-preset-stage-0": "^6.5.0",
     "flow-bin": "^0.26.0",
     "iflow-immutable": "^1.0.32",
-    "jest-cli": "^12.1.1"
+    "jest-cli": "^12.1.1",
+    "nsp": "^2.4.0"
   },
   "scripts": {
+    "nsp": "nsp check",
     "flow": "flow check",
     "jest": "jest",
     "jest:coverage": "jest --coverage",
@@ -28,7 +30,7 @@
     "test": "npm run flow && npm run jest",
     "build": "npm run babel",
 
-    "prepublish": "npm run test && npm run build"
+    "prepublish": "npm run nsp && npm run test && npm run build"
   },
   "jest": {
     "unmockedModulePathPatterns": [
