@@ -8,49 +8,6 @@ function createUpdater(finalState) {
 }
 
 describe('Store', () => {
-  describe('register(...)', () => {
-    pit('will return a new store, with the given function registered as an updater', () => {
-      // Test Data
-      const updaters = [ createUpdater(), createUpdater(), createUpdater() ];
-      let store = createStore({});
-
-      // Perform Tests
-      store = store.register(updaters[0]);
-      store = store.register(updaters[1]);
-      store = store.register(updaters[2]);
-
-      return store.dispatch({}).then(() => {
-        // Check the registered updaters where called
-        updaters.forEach((updater) => {
-          const { calls } = updater.mock;
-          expect(calls.length).toBe(1);
-        });
-      });
-    });
-
-    it('throws an error if given value is not a function', () => {
-      // Test Data
-      const updaters = [
-        'not a function',
-        1,
-        null,
-        undefined,
-        true,
-        {}
-      ];
-      const store = createStore();
-
-      // Preform Tests
-      updaters.forEach((updater) => {
-        const performRegister = () => {
-          store.register(updater);
-        };
-
-        expect(performRegister).toThrow();
-      });
-    });
-  });
-
   describe('dispatch(...)', () => {
     pit('will call each updater, with the given action', () => {
       // Test Data
@@ -60,10 +17,10 @@ describe('Store', () => {
         createUpdater(),
         createUpdater()
       ];
-      let store = createStore({});
-      for(let i=0; i<updaters.length; i++) {
-        store = store.register(updaters[i]);
-      }
+      const store = createStore({
+        initialState: {},
+        updaters
+      });
 
       // Perform Tests
       return store.dispatch(action).then(() => {
@@ -85,10 +42,10 @@ describe('Store', () => {
         createUpdater(),
         createUpdater()
       ];
-      let store = createStore(initialState);
-      for(let i=0; i<updaters.length; i++) {
-        store = store.register(updaters[i]);
-      }
+      const store = createStore({
+        initialState,
+        updaters
+      });
 
       // Perform Tests
       return store.dispatch({ }).then(() => {
@@ -112,10 +69,10 @@ describe('Store', () => {
         createUpdater(Promise.resolve(updatedStates[2])),
         createUpdater()
       ];
-      let store = createStore({});
-      for(let i=0; i<updaters.length; i++) {
-        store = store.register(updaters[i]);
-      }
+      const store = createStore({
+        initialState: {},
+        updaters
+      });
 
       // Perform Tests
       return store.dispatch({ }).then(() => {
@@ -132,15 +89,14 @@ describe('Store', () => {
     pit('will return a promise with the state from the final updater', () => {
       // Test Data
       const finalState = { data: 'test state' };
-      const updaters = [
-        createUpdater(),
-        createUpdater(),
-        createUpdater(finalState)
-      ];
-      let store = createStore({});
-      for(let i=0; i<updaters.length; i++) {
-        store = store.register(updaters[i]);
-      }
+      const store = createStore({
+        initialState: {},
+        updaters: [
+          createUpdater(),
+          createUpdater(),
+          createUpdater(finalState)
+        ]
+      });
 
       // Perform Tests
       return store.dispatch({ }).then((newStore) => {
@@ -156,10 +112,10 @@ describe('Store', () => {
         jest.fn(() => { throw testError; }),
         createUpdater()
       ];
-      let store = createStore({});
-      for(let i=0; i<updaters.length; i++) {
-        store = store.register(updaters[i]);
-      }
+      const store = createStore({
+        initialState: {},
+        updaters
+      });
 
       // Perform Tests
       return store.dispatch({ }).then(() => {
@@ -184,8 +140,7 @@ describe('Store', () => {
         function() { },
         //{ error: function() {} }          //TODO, add deep checks
       ];
-
-      const store = createStore();
+      const store = createStore({}, []);
 
       // Preform Tests
       actions.forEach((action) => {
@@ -202,7 +157,7 @@ describe('Store', () => {
     it('will get the initial state, if dispatch was not called', () => {
       // Test Data
       const initialState = { data: 'test state' };
-      const store = createStore(initialState)
+      const store = createStore({ initialState, updaters: [] })
 
       // Perform Tests
       expect(store.getState()).toBe(initialState);
@@ -211,7 +166,10 @@ describe('Store', () => {
     pit('will get the updated state, if returned from the dispatch(...) method', () => {
       // Test Data
       const updatedState = { data: 'test state' };
-      const store = createStore({}).register(createUpdater(updatedState));
+      const store = createStore({
+        initialState: {},
+        updaters: [ createUpdater(updatedState) ]
+      });
 
       // Perform Tests
       return store.dispatch({}).then((newStore) => {

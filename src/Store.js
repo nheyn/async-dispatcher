@@ -3,6 +3,11 @@
  */
 import Immutable from 'immutable';
 
+type StoreSpec<S> = {
+  initialState: S,
+  updaters: Array<Updater<S>>
+};
+
 /**
  * A store that uses updaters to dispatch changes to its state.
  */
@@ -28,23 +33,8 @@ export default class Store<S> {
    *
    * @return              {Store} The new Store
    */
-  static createStore(initialState: S): Store<S> {
-    return new Store(initialState, Immutable.List());
-  }
-
-  /**
-   * Registers a new updator in the store.
-   *
-   * @param updater {Updater}       The new function that is able to update the store's state
-   *
-   * @throws                        An error when the given updater is not a function
-   *
-   * @return        {Store}         A new Store with the new updater
-   */
-  register(updater: Updater<S>): Store<S> {
-    if(typeof updater !== 'function') throw new Error('updaters must be functions');
-
-    return new Store(this._state, this._updaters.push(updater));
+  static createStore({ initialState, updaters }: StoreSpec<S>): Store<S> {
+    return new Store(initialState, Immutable.List(updaters));
   }
 
   /**
@@ -92,8 +82,8 @@ export default class Store<S> {
 /**
  * See static method Store.createStore(...)
  */
-export function createStore<S>(initialState: S): Store<S> {
-  return Store.createStore(initialState);
+export function createStore<S>(spec: StoreSpec<S>): Store<S> {
+  return Store.createStore(spec);
 }
 
 /**
