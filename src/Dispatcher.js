@@ -3,13 +3,14 @@
  */
 import Immutable from 'immutable';
 
+import ActionQueue from './utils/ActionQueue';
+import ActionAsyncTracker from './utils/ActionAsyncTracker';
+import mapOfPromisesToMapPromise from './utils/mapOfPromisesToMapPromise';
+
 import type Store from './Store';
 
 type StoresMap = Immutable.Map<string, Store<any>>;
 type SubscriberMap = Immutable.Map<string, Immutable.Set<Subscriber>>;
-type ActionList = Immutable.List<Action>;
-type PromiseFuncs = { resolve: (state: any) => void, reject: (err: Error) => void };
-type PromiseFuncsMap = Immutable.Map<Action, PromiseFuncs>;
 
 /**
  * A class that contains a group of stores that should all receive the same actions.
@@ -32,7 +33,7 @@ export default class Dispatcher {
     this._actions = ActionQueue.createActionQueue();
     this._actionAsyncTracker = ActionAsyncTracker.createActionAsyncTracker();
 
-    if(!this._actions.isEmpty()) this._dispatchFromQueue();
+    if(!this._actions.isEmpty()) this._dispatchActionFromQueue();
   }
 
   /**
@@ -59,15 +60,15 @@ export default class Dispatcher {
    * @return        {Promise<{string: any}>}  The states after the dispatch is finished
    */
   dispatch(action: Action): Promise<Dispatcher> {
-    const shouldStartDispatcher = this._actions.isEmpty();
+    const shouldStartDispatch = this._actions.isEmpty();
 
     // Enqueue given action
     this._actions = this._actions.enqueue(action);
 
     // Start dispatch if needed
-    if(shouldStartDispatcher) this._dispatchFromQueue();
+    if(shouldStartDispatch) this._dispatchActionFromQueue();
 
-    // Return a promise that resolves when the given promise is called
+    // Return a promise that resolves when the given action finishes dispatching
     const { tracker, promise } = this._actionAsyncTracker.waitForAction(action);
     this._actionAsyncTracker = tracker;
 
@@ -82,9 +83,7 @@ export default class Dispatcher {
    * @return          {any}   The state of the given store
    */
   getStateFor(storeName: string): any {
-    if(!this._stores.has(storeName)) {
-      throw new Error(`store name(${storeName}) does not exist`);
-    }
+    if(!this._stores.has(storeName)) throw new Error(`store name, ${storeName}, does not exist`);
 
     return this._stores.get(storeName).getState();
   }
@@ -99,43 +98,29 @@ export default class Dispatcher {
    * @return            {() => void}    The function to call to unsubscibe
    */
   subscribeTo(storeName: string, subscriber: Subscriber<any>): UnsubscibeFunc {
-    // Check inputs
     if(typeof subscriber !== 'function') throw new Error('Cannot subscribe: subscriber must be a function');
     if(typeof storeName !== 'string') throw new Error('Cannot subscribe: store name must be a string');
     if(!this._subscribers.has(storeName)) {
       throw new Error(`Cannot subscribe: "${storeName}" dose not exist`);
     }
 
-    // Subscribe
+    // Add to list of subscribe for given store
     const currSubscribers = this._subscribers.get(storeName);
     this._subscribers = this._subscribers.set(storeName, currSubscribers.add(subscriber));
 
-    // Create unsubscribe function
-    let hasUnsubscribed = false;
-    return () => {
-      if(hasUnsubscribed) {
-        throw new Error('Cannot unsubscribe: subscriber has already been removed from the dispatcher');
-      }
-
-      // Unsubscribe
-      const currSubscribers = this._subscribers.get(storeName);
-      this._subscribers = this._subscribers.set(storeName, currSubscribers.delete(subscriber));
-
-      hasUnsubscribed = true;
-    };
+    // Return a function that will unsubscribe the subscriber
+    return this._createUnsubscribFunc(storeName, subscriber)
   }
 
-  _dispatchFromQueue() {
-    // Dequeue action
+  _dispatchActionFromQueue() {
+    // Dequeue next action
     const { action, queue } = this._actions.dequeue();
     this._actions = queue;
 
-    // Call dispatch on each store
-    const newStoresPromise = mapOfPromisesToMapPromise(this._stores.map((store) => {
-      return store.dispatch(action);
-    }));
+    // Perform dispatch on each store
+    const newStoresPromise = dispatch(action, this._stores);
 
-    // Handle results of dispatch
+    // Handle the updated states
     newStoresPromise.then((newStores) => {
       this._setStores(newStores);
 
@@ -144,7 +129,7 @@ export default class Dispatcher {
       this._actionAsyncTracker.rejectForAction(action, err);
     }).then(() => {
       // Start next dispatch if there are actions left in the queue
-      if(!this._actions.isEmpty()) this._dispatchFromQueue();
+      if(!this._actions.isEmpty()) this._dispatchActionFromQueue();
     });
   }
 
@@ -162,6 +147,21 @@ export default class Dispatcher {
       });
     });
   }
+
+  _createUnsubscribFunc(storeName: string, subscriber: Subscriber<any>): UnsubscibeFunc {
+    let hasUnsubscribed = false;
+    return () => {
+      if(hasUnsubscribed) {
+        throw new Error('Cannot unsubscribe: subscriber has already been removed from the dispatcher');
+      }
+
+      // Perform unsubscribe
+      const currSubscribers = this._subscribers.get(storeName);
+      this._subscribers = this._subscribers.set(storeName, currSubscribers.delete(subscriber));
+
+      hasUnsubscribed = true;
+    };
+  }
 }
 
 /**
@@ -171,113 +171,19 @@ export function createDispatcher(initialStores: {[key: string]: Store<any>}): Di
   return Dispatcher.createDispatcher(initialStores);
 }
 
-// Helper classes/funcs
-class ActionQueue {
-  _actions: ActionList;
-
-  constructor(initialActions: ActionList) {
-    this._actions = initialActions;
-  }
-
-  static createActionQueue(): ActionQueue {
-    return new ActionQueue(Immutable.List());
-  }
-
-  isEmpty(): bool {
-    return this._actions.isEmpty();
-  }
-
-  enqueue(action: Action): ActionQueue {
-    const newActions = this._actions.push(action);
-
-    return new ActionQueue(newActions);
-  }
-
-  dequeue(): { action: Action, queue: ActionQueue } {
-    if(this._actions.count() === 0) throw new Error('Cannot dequeue an action when the actions queue is empty');
-
-    const action = this._actions.first();
-    const newActions = this._actions.shift();
-
-    const queue = new ActionQueue(newActions);
-
-    return { action, queue };
-  }
-}
-
-class ActionAsyncTracker<T> {
-  _promiseFuncs: PromiseFuncsMap;
-
-  constructor(initialPromiseFuncs: PromiseFuncsMap) {
-    this._promiseFuncs = initialPromiseFuncs;
-  }
-
-  static createActionAsyncTracker(): ActionAsyncTracker {
-    return new ActionAsyncTracker(Immutable.Map());
-  }
-
-  waitForAction(action: Action): { promise: Promise<T>, tracker: ActionAsyncTracker } {
-    if(this._promiseFuncs.has(action))  throw new Error('Promise for action has already been return');
-
-    let resolve = null;
-    let reject = null;
-    const promise = new Promise((res, rej) => {
-      resolve = res;
-      reject = rej;
-    });
-    if(!resolve || !reject) throw new Error('Invalid Promise implementation, constructor executor func should be sync');
-
-    const newPromiseFuncs = this._promiseFuncs.set(action, { resolve, reject });
-    const tracker = new ActionAsyncTracker(newPromiseFuncs);
-
-    return { promise, tracker };
-  }
-
-  resolveForAction(action: Action, val: T): ActionAsyncTracker {
-    const { funcs: { resolve }, tracker } = this._getAndDeletePromiseFuncs(action);
-
-    resolve(val);
-
-    return tracker;
-  }
-
-  rejectForAction(action: Action, err: Error): ActionAsyncTracker {
-    const { funcs: { reject }, tracker } = this._getAndDeletePromiseFuncs(action);
-
-    reject(err);
-
-    return tracker;
-  }
-
-  _getAndDeletePromiseFuncs(action: Action): { funcs: PromiseFuncs, tracker: ActionAsyncTracker } {
-    if(!this._promiseFuncs.has(action))  throw new Error('Invalid action');
-
-    const funcs = this._promiseFuncs.get(action);
-    const newPromiseFuncs = this._promiseFuncs.delete(action);
-
-    const tracker = new ActionAsyncTracker(newPromiseFuncs);
-
-    return { funcs, tracker };
-  }
-}
-
-function mapOfPromisesToMapPromise<T>(promises: Immutable.Map<string, Promise<T>>): Promise<Immutable.Map<string, T>> {
-  let keys = [];
-  let promiseArray = [];
-  const storePromisesObject = promises.toObject()
-  for(let storeName in storePromisesObject) {
-    const storePromise = storePromisesObject[storeName];
-
-    keys.push(storeName);
-    promiseArray.push(storePromise);
-  }
-
-  return Promise.all(promiseArray).then((storeArray) => {
-    let storesObject = {};
-    keys.forEach((storeName, i) => {
-      storesObject[storeName] = storeArray[i];
-    });
-
-    return Immutable.Map(storesObject);
+/**
+ * Dispatch the action to each of the stores.
+ *
+ * @param action  {Action}                The action to perform
+ * @param stores  {Map<Store>}            The stores to perform the action on
+ *
+ * @return        {Promise<Map<Stores>>}  A promise that resolves to a map of stores after the given action
+ */
+function dispatch(action: Action, stores: StoresMap): Promise<StoresMap> {
+  // Call dispatch on each store
+  const storePromises = stores.map((store) => {
+    return store.dispatch(action);
   });
+
+  return mapOfPromisesToMapPromise(storePromises);
 }
