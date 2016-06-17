@@ -3,10 +3,7 @@
  */
 import Immutable from 'immutable';
 
-export type StoreSpec<S> = {
-  initialState: S,
-  updaters: Array<Updater<S>>
-};
+import type { Action, StoreSpec, StoreDispatchSettings, Updater } from 'async-dispatcher';
 
 /**
  * A store that uses updaters to dispatch changes to its state.
@@ -50,7 +47,7 @@ export default class Store<S> {
    *
    * @return          {Promise<Store>}  A Promise with the new Store with the state after calling the updaters
    */
-  dispatch(action: Action, settings: DispatchSettings<S> = {}): Promise<Store<S>> {
+  dispatch(action: Action, settings: StoreDispatchSettings<S> = {}): Promise<Store<S>> {
     if(!action || typeof action !== 'object')                   throw new Error('actions must be objects');
     if(settings.skip && typeof settings.skip !== 'number')      throw new Error('settings.skip must be a number');
     if(settings.skip && settings.skip < 0)                      throw new Error('settings.skip must be positive');

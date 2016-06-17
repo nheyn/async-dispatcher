@@ -3,6 +3,8 @@
  */
 import Immutable from 'immutable';
 
+import type { Action } from 'async-dispatcher';
+
 type PromiseFuncs = { resolve: (state: any) => void, reject: (err: Error) => void };
 type PromiseFuncsMap = Immutable.Map<Action, PromiseFuncs>;
 

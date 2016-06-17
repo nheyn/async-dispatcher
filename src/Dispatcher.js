@@ -7,6 +7,7 @@ import ActionQueue from './utils/ActionQueue';
 import ActionAsyncTracker from './utils/ActionAsyncTracker';
 import mapOfPromisesToMapPromise from './utils/mapOfPromisesToMapPromise';
 
+import type { Action, Subscriber, UnsubscibeFunc } from 'async-dispatcher';
 import type Store from './Store';
 
 type StoresMap = Immutable.Map<string, Store<any>>;

@@ -5,7 +5,7 @@
 [include]
 
 [libs]
-flowlib/
+type.js
 node_modules/iflow-immutable/index.js.flow
 
 [options]

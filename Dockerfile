@@ -14,7 +14,8 @@ RUN chown node:node ./
 COPY ./flowlib ./flowlib
 COPY ./.flowconfig ./.flowconfig
 COPY ./.babelrc ./.babelrc
-COPY ./package.json	./package.json
+COPY ./package.json ./package.json
+COPY ./type.js ./type.js
 COPY ./src ./src
 COPY ./__tests__ ./__tests__
 RUN chown -R node:node ./*

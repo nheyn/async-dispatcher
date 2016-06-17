@@ -3,6 +3,8 @@
  */
 import Immutable from 'immutable';
 
+import type { Action } from 'async-dispatcher';
+
 type ActionList = Immutable.List<Action>;
 
 /**

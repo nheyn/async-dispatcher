@@ -4,7 +4,7 @@
 import Dispatcher from './Dispatcher';
 import Store from './Store';
 
-import type { StoreSpec } from './Store';
+import type { StoreSpec } from 'async-dispatcher';
 
 /**
  * See static method Dispatcher.createDispatcher(...)
