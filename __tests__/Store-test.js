@@ -1,7 +1,7 @@
 jest.unmock('../src/Store');
 
 import Immutable from 'immutable';
-import Store, { createStore } from '../src/Store';
+import Store from '../src/Store';
 
 function createUpdater(finalState) {
   return jest.fn().mockImplementation((initialState) => finalState? finalState: initialState);
@@ -17,7 +17,7 @@ describe('Store', () => {
         createUpdater(),
         createUpdater()
       ];
-      const store = createStore({
+      const store = Store.createStore({
         initialState: {},
         updaters
       });
@@ -42,7 +42,7 @@ describe('Store', () => {
         createUpdater(),
         createUpdater()
       ];
-      const store = createStore({
+      const store = Store.createStore({
         initialState,
         updaters
       });
@@ -69,7 +69,7 @@ describe('Store', () => {
         createUpdater(Promise.resolve(updatedStates[2])),
         createUpdater()
       ];
-      const store = createStore({
+      const store = Store.createStore({
         initialState: {},
         updaters
       });
@@ -89,7 +89,7 @@ describe('Store', () => {
     pit('will return a promise with the state from the final updater', () => {
       // Test Data
       const finalState = { data: 'test state' };
-      const store = createStore({
+      const store = Store.createStore({
         initialState: {},
         updaters: [
           createUpdater(),
@@ -112,7 +112,7 @@ describe('Store', () => {
         jest.fn(() => { throw testError; }),
         createUpdater()
       ];
-      const store = createStore({
+      const store = Store.createStore({
         initialState: {},
         updaters
       });
@@ -140,7 +140,7 @@ describe('Store', () => {
         function() { },
         //{ error: function() {} }          //TODO, add deep checks
       ];
-      const store = createStore({}, []);
+      const store = Store.createStore({}, []);
 
       // Preform Tests
       actions.forEach((action) => {
@@ -157,7 +157,7 @@ describe('Store', () => {
     it('will get the initial state, if dispatch was not called', () => {
       // Test Data
       const initialState = { data: 'test state' };
-      const store = createStore({ initialState, updaters: [] })
+      const store = Store.createStore({ initialState, updaters: [] })
 
       // Perform Tests
       expect(store.getState()).toBe(initialState);
@@ -166,7 +166,7 @@ describe('Store', () => {
     pit('will get the updated state, if returned from the dispatch(...) method', () => {
       // Test Data
       const updatedState = { data: 'test state' };
-      const store = createStore({
+      const store = Store.createStore({
         initialState: {},
         updaters: [ createUpdater(updatedState) ]
       });

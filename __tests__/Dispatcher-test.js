@@ -2,7 +2,7 @@ jest.unmock('../src/Dispatcher');
 
 import Immutable from 'immutable';
 import Store from '../src/Store';
-import Dispatcher, { createDispatcher } from '../src/Dispatcher';
+import Dispatcher from '../src/Dispatcher';
 
 function createStore(initialState) {
   const store = new Store(initialState);
@@ -22,7 +22,7 @@ describe('Dispatcher', () => {
         storeB: createStore({}),
         storeC: createStore({})
       };
-      const dispatcher = createDispatcher(stores);
+      const dispatcher = Dispatcher.createDispatcher(stores);
       const dispatchCount = 3;
 
       // Perform Test
@@ -51,7 +51,7 @@ describe('Dispatcher', () => {
         storeB: createStore({}),
         storeC: createStore({})
       };
-      const dispatcher = createDispatcher(stores);
+      const dispatcher = Dispatcher.createDispatcher(stores);
 
       // Perform Test
       return dispatcher.dispatch(action).then(() => {
@@ -66,7 +66,7 @@ describe('Dispatcher', () => {
 
     pit('returns a Promise with the Dispatcher', () => {
       // Test Data
-      const dispatcher = createDispatcher({ });
+      const dispatcher = Dispatcher.createDispatcher({ });
 
       // Perform Test
       return dispatcher.dispatch({}).then((returnedDispatcher) => {
@@ -86,7 +86,7 @@ describe('Dispatcher', () => {
         storeB: createStore(initialStates.storeB),
         storeC: createStore(initialStates.storeC)
       };
-      const dispatcher = createDispatcher(stores);
+      const dispatcher = Dispatcher.createDispatcher(stores);
       const testError = new Error();
       stores.storeB.dispatch = jest.fn().mockImplementation(() => Promise.reject(testError));
 
@@ -119,7 +119,7 @@ describe('Dispatcher', () => {
       stores.storeB.dispatch.mockReturnValue(Promise.resolve(new Error()));
       stores.storeC.dispatch.mockReturnValue(createStore(updatedStates.storeC));
 
-      const dispatcher = createDispatcher(stores);
+      const dispatcher = Dispatcher.createDispatcher(stores);
 
       // Perform Test
       return dispatcher.dispatch({}).catch(() => {
@@ -145,7 +145,7 @@ describe('Dispatcher', () => {
           resolve({});
         }, 100);
       }));
-      const dispatcher = createDispatcher({ store });
+      const dispatcher = Dispatcher.createDispatcher({ store });
 
       // Perform Test
       let dispatchPromise = null;
@@ -173,7 +173,7 @@ describe('Dispatcher', () => {
         storeB: { data: 'b' },
         storeC: { data: 'c' }
       };
-      const dispatcher = createDispatcher({
+      const dispatcher = Dispatcher.createDispatcher({
         storeA: createStore(initialStates.storeA),
         storeB: createStore(initialStates.storeB),
         storeC: createStore(initialStates.storeC)
@@ -206,7 +206,7 @@ describe('Dispatcher', () => {
       stores.storeB.dispatch.mockReturnValue(createStore(updatedStates.storeB));
       stores.storeC.dispatch.mockReturnValue(createStore(updatedStates.storeC));
 
-      const dispatcher = createDispatcher(stores);
+      const dispatcher = Dispatcher.createDispatcher(stores);
 
       // Perform Test
       return dispatcher.dispatch({}).then(() => {
@@ -243,7 +243,7 @@ describe('Dispatcher', () => {
       };
       stores.storeA.dispatch.mockReturnValue(createStore(updatedStates.storeA));
       stores.storeC.dispatch.mockReturnValue(createStore(updatedStates.storeC));
-      const dispatcher = createDispatcher(stores);
+      const dispatcher = Dispatcher.createDispatcher(stores);
 
       // Perform Test
       const dispatchPromise = dispatcher.dispatch({});
@@ -263,7 +263,7 @@ describe('Dispatcher', () => {
 
     it('throws an error if a non existent store name is given', () => {
       // Test Data
-      const dispatcher = createDispatcher({ validStoreName: createStore({}) });
+      const dispatcher = Dispatcher.createDispatcher({ validStoreName: createStore({}) });
 
       // Perform Test
       const tryInvalidStore = () => dispatcher.getStateFor('invalidStore');
@@ -280,7 +280,7 @@ describe('Dispatcher', () => {
         {},
         function() { }
       ];
-      const dispatcher = createDispatcher({ validStoreName: createStore({}) });
+      const dispatcher = Dispatcher.createDispatcher({ validStoreName: createStore({}) });
 
       // Perform Test
       storeNames.forEach((storeName) => {
@@ -299,7 +299,7 @@ describe('Dispatcher', () => {
         storeB: [ jest.fn(), jest.fn(), jest.fn() ],
         storeC: [ jest.fn(), jest.fn(), jest.fn() ]
       };
-      const dispatcher = createDispatcher({
+      const dispatcher = Dispatcher.createDispatcher({
         storeA: createStore({}),
         storeB: createStore({}),
         storeC: createStore({})
@@ -368,7 +368,7 @@ describe('Dispatcher', () => {
       stores.storeB.dispatch.mockReturnValue(createStore(updatedStates.storeB));
       stores.storeC.dispatch.mockReturnValue(createStore(updatedStates.storeC));
 
-      let dispatcher = createDispatcher(stores);
+      let dispatcher = Dispatcher.createDispatcher(stores);
       subscribers.storeA.forEach((subscriber) => {
         dispatcher.subscribeTo('storeA', subscriber);
       });
@@ -409,7 +409,7 @@ describe('Dispatcher', () => {
 
     it('throws an error if a non existent store name is given', () => {
       // Test Data
-      const dispatcher = createDispatcher({ validStoreName: createStore({}) });
+      const dispatcher = Dispatcher.createDispatcher({ validStoreName: createStore({}) });
 
       // Perform Test
       const tryInvalidStore = () => dispatcher.subscribeTo('invalidStore', () => null);
@@ -426,7 +426,7 @@ describe('Dispatcher', () => {
         {},
         function() { }
       ];
-      const dispatcher = createDispatcher({ validStoreName: createStore({}) });
+      const dispatcher = Dispatcher.createDispatcher({ validStoreName: createStore({}) });
 
       // Perform Test
       storeNames.forEach((storeName) => {
@@ -445,7 +445,7 @@ describe('Dispatcher', () => {
         true,
         {}
       ];
-      const dispatcher = createDispatcher({ testStore: createStore({}) });
+      const dispatcher = Dispatcher.createDispatcher({ testStore: createStore({}) });
 
       // Performs Test
       updaters.forEach((updater) => {

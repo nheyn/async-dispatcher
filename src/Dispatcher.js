@@ -165,13 +165,6 @@ export default class Dispatcher {
 }
 
 /**
- * See static method Dispatcher.createDispatcher(...)
- */
-export function createDispatcher(initialStores: {[key: string]: Store<any>}): Dispatcher {
-  return Dispatcher.createDispatcher(initialStores);
-}
-
-/**
  * Dispatch the action to each of the stores.
  *
  * @param action  {Action}                The action to perform

@@ -3,7 +3,7 @@
  */
 import Immutable from 'immutable';
 
-type StoreSpec<S> = {
+export type StoreSpec<S> = {
   initialState: S,
   updaters: Array<Updater<S>>
 };
@@ -77,13 +77,6 @@ export default class Store<S> {
   getState(): S {
     return this._state;
   }
-}
-
-/**
- * See static method Store.createStore(...)
- */
-export function createStore<S>(spec: StoreSpec<S>): Store<S> {
-  return Store.createStore(spec);
 }
 
 /**
