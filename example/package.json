@@ -1,0 +1,31 @@
+{
+  "name": "async-dispatcher-todo-example",
+  "version": "0.0.1-dev",
+  "description": "A todo list using async-dispatcher",
+  "author": "Nick Heyn <nick@heyn.io>",
+  "dependencies": {
+    "async-dispatcher": "../../async-dispatcher",
+    "http-server": "^0.9.0",
+    "react": "^15.1.0",
+    "react-dom": "^15.1.0"
+  },
+  "devDependencies": {
+    "babel-cli": "^6.9.0",
+    "babel-jest": "^12.1.0",
+    "babel-plugin-transform-flow-strip-types": "^6.8.0",
+    "babel-polyfill": "^6.9.1",
+    "babel-preset-es2015": "^6.9.0",
+    "babel-preset-react": "^6.5.0",
+    "browserify": "^13.0.1"
+  },
+  "scripts": {
+    "babel": "babel ./src/ -d ./lib/",
+    "browserify": "browserify ./lib/index.js -o ./public/app.js",
+
+    "build": "npm run babel && npm run browserify",
+
+    "prepublish": "npm run build",
+    "start": "http-server ./public -p 8080"
+  },
+  "license": "MIT"
+}

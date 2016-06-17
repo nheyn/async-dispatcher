@@ -1,4 +1,4 @@
-# A Docker image to run the jest tests
+# A Docker image to run the todo list example
 FROM node:5
 
 # Get needed libraries
@@ -11,16 +11,22 @@ WORKDIR /home/node/async-dispatcher/
 RUN chown node:node ./
 
 # Get async-dispatcher files
-COPY ./flowlib ./flowlib
 COPY ./.flowconfig ./.flowconfig
 COPY ./.babelrc ./.babelrc
 COPY ./package.json ./package.json
 COPY ./type.js ./type.js
 COPY ./src ./src
 COPY ./__tests__ ./__tests__
+COPY ./example ./example
 RUN chown -R node:node ./*
 
-# Run test
+# Run tests
 USER node
 RUN npm install
-CMD npm run test
+
+# Start example
+WORKDIR /home/node/async-dispatcher/example/
+RUN npm install
+CMD npm start
+
+EXPOSE 8080
