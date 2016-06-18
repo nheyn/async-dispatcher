@@ -3,8 +3,8 @@
  */
 import Immutable from 'immutable';
 
-import ActionQueue from './utils/ActionQueue';
-import ActionAsyncTracker from './utils/ActionAsyncTracker';
+import Queue from './utils/Queue';
+import AsyncTracker from './utils/AsyncTracker';
 import mapOfPromisesToMapPromise from './utils/mapOfPromisesToMapPromise';
 
 import type { Action, Subscriber, UnsubscibeFunc } from 'async-dispatcher';
@@ -19,8 +19,8 @@ type SubscriberMap = Immutable.Map<string, Immutable.Set<Subscriber>>;
 export default class Dispatcher {
   _stores: StoresMap;
   _subscribers: SubscriberMap;
-  _actions: ActionQueue;
-  _actionAsyncTracker: ActionAsyncTracker;
+  _actions: Queue<Action>;
+  _asyncTracker: AsyncTracker<Action, Dispatcher>;
 
   /**
    * Constructor for the Dispatcher.
@@ -28,11 +28,16 @@ export default class Dispatcher {
    * @param initialStores       {Immutable.Map<Store>}                          The initial stores
    * @param initialSubscribers  {Immutable.Map<Immutable.Set<(any) => void>>}   The initial subscribers
    */
-  constructor(initialStores: StoresMap, initialSubscribers: SubscriberMap) {
+  constructor(
+    initialStores: StoresMap,
+    initialSubscribers: SubscriberMap,
+    initialActions: Queue<Action>,
+    initialAsyncTracker: AsyncTracker
+  ) {
     this._stores = initialStores;
     this._subscribers = initialSubscribers;
-    this._actions = ActionQueue.createActionQueue();
-    this._actionAsyncTracker = ActionAsyncTracker.createActionAsyncTracker();
+    this._actions = initialActions;
+    this._asyncTracker = initialAsyncTracker;
 
     if(!this._actions.isEmpty()) this._dispatchActionFromQueue();
   }
@@ -49,7 +54,9 @@ export default class Dispatcher {
 
     return new Dispatcher(
       initialStoreMap,
-      initialStoreMap.map(() => Immutable.Set())
+      initialStoreMap.map(() => Immutable.Set()),
+      Queue.createQueue(),
+      AsyncTracker.createAsyncTracker()
     );
   }
 
@@ -70,8 +77,8 @@ export default class Dispatcher {
     if(shouldStartDispatch) this._dispatchActionFromQueue();
 
     // Return a promise that resolves when the given action finishes dispatching
-    const { tracker, promise } = this._actionAsyncTracker.waitForAction(action);
-    this._actionAsyncTracker = tracker;
+    const { tracker, promise } = this._asyncTracker.waitFor(action);
+    this._asyncTracker = tracker;
 
     return promise;
   }
@@ -115,7 +122,7 @@ export default class Dispatcher {
 
   _dispatchActionFromQueue() {
     // Dequeue next action
-    const { action, queue } = this._actions.dequeue();
+    const { element: action, queue } = this._actions.dequeue();
     this._actions = queue;
 
     // Perform dispatch on each store
@@ -125,9 +132,9 @@ export default class Dispatcher {
     newStoresPromise.then((newStores) => {
       this._setStores(newStores);
 
-      this._actionAsyncTracker.resolveForAction(action, this);
+      this._asyncTracker.resolveFor(action, this);
     }).catch((err) => {
-      this._actionAsyncTracker.rejectForAction(action, err);
+      this._asyncTracker.rejectFor(action, err);
     }).then(() => {
       // Start next dispatch if there are actions left in the queue
       if(!this._actions.isEmpty()) this._dispatchActionFromQueue();
