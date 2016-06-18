@@ -1,38 +1,66 @@
 /*
  * @flow
  */
-import type { Action } from 'async-dispatcher';
-import type { ListItemsState } from './index.js';
+import type { ListItemState } from './index.js';
+
+type Action = {
+  type: string,
+  id: number
+};
 
 export const LIST_ITEM_CHECK = 'LIST_ITEM_CHECK';
-export const LIST_ITEM_UNCHECK = 'LIST_ITEM_CHECK';
+export const LIST_ITEM_UNCHECK = 'LIST_ITEM_UNCHECK';
 
-export default function checkItem(state: Array<ListItemsState>, action: Action): Array<ListItemsState> {
-  if(action.type !== LIST_ITEM_CHECK || action.type !== LIST_ITEM_UNCHECK) return state;
-  if(!action.id || typeof action.id !== 'number') throw new Error(`listItems ${action.type} requires a numeric id`);
+export default function checkItem(state: Array<ListItemState>, action: Action): Array<ListItemState> {
+  if(action.type !== LIST_ITEM_CHECK && action.type !== LIST_ITEM_UNCHECK) return state;
+  if(typeof action.id !== 'number') throw new Error(`listItems ${action.type} requires a numeric id`);
+  const { type, id } = action
 
-  // Lookup item
-  let item = null;
-  let itemIndex = null;
-  for(let i=0; i<state.length; i++) {
-    const currItem = state[i];
+  // Get item
+  const item = lookupItem(id, state);
+  if(!item) throw new Error(`listItems ${type} requires a valid id`);
 
-    if(currItem.id === action.id) {
-      item = currItem;
-      itemIndex = i;
+  // Update item
+  let newItem = { ...item };
+  newItem.isChecked = shouldBeChecked(type);
+
+  // Replace item
+  const updatedState = replaceItem(id, state, newItem);
+  if(!updatedState) throw new Error(`listItems ${type} requires a valid id`);
+
+  return updatedState;
+}
+
+// Helper functions
+function lookupItem(id: number, items: Array<ListItemState>): ?ListItemState {
+  for(let i=0; i<items.length; i++) {
+    const item = items[i];
+
+    if(item.id === id) return item;
+  }
+  return null;
+}
+
+function replaceItem(id: number, items: Array<ListItemState>, item: ListItemState): ?Array<ListItemState> {
+  let index = null;
+  for(let i=0; i<items.length; i++) {
+    const item = items[i];
+    if(item.id === id) {
+      index = i;
       break;
     }
   }
-  if(!item) throw new Error(`listItems ${action.type} requires a valid id`);
+  if(index === null) return null;
 
-  // Update item
-  const newItem = {
-    ...item,
-    { checkItem: action.type === LIST_ITEM_CHECK }
-  };
+  let newItems = [ ...items ];
+  newItems[index] = item;
 
-  const newState = [ ...state ];
-  newState[itemIndex] = newItem;
+  return newItems;
+}
 
-  return newState;
+function shouldBeChecked(actionType: string): bool {
+  if(actionType === LIST_ITEM_CHECK)    return true;
+  if(actionType === LIST_ITEM_UNCHECK)  return false;
+
+  throw new Error(`Invalid action type ${actionType}`);
 }

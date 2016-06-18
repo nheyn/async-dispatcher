@@ -6,6 +6,12 @@ import { createStore } from 'async-dispatcher';
 import addItem from './addItem';
 import checkItem from './checkItem';
 
+export type ListItemState = {
+  id: number,
+  label: string,
+  isChecked: bool
+};
+
 export default createStore({
   initialState: [
     { id: 0, label: 'Item 0', isChecked: false },
