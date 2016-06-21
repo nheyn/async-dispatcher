@@ -7,6 +7,10 @@ function createUpdater(finalState) {
   return jest.fn().mockImplementation((initialState) => finalState? finalState: initialState);
 }
 
+function createMiddlware(impl) {
+  return jest.fn().mockImplementation(impl? impl: (state, action, next) => next(state, action));
+}
+
 describe('Store', () => {
   describe('dispatch(...)', () => {
     pit('will call each updater, with the given action', () => {
@@ -101,6 +105,179 @@ describe('Store', () => {
       // Perform Tests
       return store.dispatch({ }).then((newStore) => {
         expect(newStore.getState()).toEqual(finalState);
+      });
+    });
+
+    pit('will call all the middleware in the store for each updater', () => {
+      // Test Data
+      const updaters = [
+        createUpdater(),
+        createUpdater(),
+        createUpdater()
+      ];
+      const middleware = [
+        createMiddlware(),
+        createMiddlware(),
+        createMiddlware()
+      ];
+      const store = Store.createStore({
+        initialState: {},
+        updaters,
+        middlware
+      });
+
+       // Perform Tests
+      return store.dispatch({ }).then(() => {
+        for(let i=0; i<middlware.length; i++) {
+          const { calls } = middlware[i].mock;
+          expect(calls.length).toBe(updaters.length);
+        }
+      });
+    });
+
+    pit('will call the middlware with stores state', () => {
+      // Test Data
+      const initialState = { data: 'test state' };
+      const middleware = [
+        createMiddlware(),
+        createMiddlware(),
+        createMiddlware()
+      ];
+      const store = Store.createStore({
+        initialState,
+        updaters: [
+          createUpdater(),
+          createUpdater(),
+          createUpdater()
+        ],
+        middlware
+      });
+
+       // Perform Tests
+      return store.dispatch({ }).then(() => {
+        for(let i=0; i<middlware.length; i++) {
+          const { calls } = middlware[i].mock;
+          for(let j=0; j<calls.length; j++) {
+            const [ state ] = calls[j];
+
+            expect(state).toEqual(initialState);
+          }
+        }
+      });
+    });
+
+    pit('will call the middlware with dispatched action', () => {
+      // Test Data
+      const action = { type: 'TEST_ACTION' };
+      const middleware = [
+        createMiddlware(),
+        createMiddlware(),
+        createMiddlware()
+      ];
+      const store = Store.createStore({
+        initialState: {},
+        updaters: [
+          createUpdater(),
+          createUpdater(),
+          createUpdater()
+        ],
+        middlware
+      });
+
+       // Perform Tests
+      return store.dispatch(action).then(() => {
+        for(let i=0; i<middlware.length; i++) {
+          const { calls } = middlware[i].mock;
+          for(let j=0; j<calls.length; j++) {
+            const [ _, dispatchedAction ] = calls[j];
+
+            expect(dispatchedAction).toBe(action);
+          }
+        }
+      });
+    });
+
+    it('will have a next function, that can call the updaters and "lower" middlware with a modified state', () => {
+      // Test Data
+      const initialState = { data: 'test state' };
+      const updatedState = { data: 'modified test state' };
+      const updaters = [
+        createUpdater(),
+        createUpdater(),
+        createUpdater()
+      ];
+      const middleware = [
+        createMiddlware(),
+        createMiddlware((_, action, next) => next(updatedState, action)),
+        createMiddlware()
+      ];
+      const store = Store.createStore({
+        initialState,
+        updaters,
+        middlware
+      });
+
+       // Perform Tests
+      return store.dispatch({}).then(() => {
+        for(let i=0; i<middlware.length; i++) {
+          // Check if the middlware is passed the correct state
+          const { calls } = middlware[i].mock;
+          for(let j=0; j<calls.length; j++) {
+            const [ state ] = calls[j];
+
+            if(i === 0) expect(state).toEqual(initialState);
+            else        expect(state).toEqual(updatedState);
+          }
+
+          // Check if the updaters are passed the updated state
+          for(let j=0; j<updater.length; j++) {
+            const [ state ] = updater.mock.calls[j];
+
+            expect(state).toEqual(updatedState);
+          }
+        }
+      });
+    });
+
+    it('will have a next function, that can call the updaters and "lower" middlware  with a modified action', () => {
+      // Test Data
+      const initialAction = { type: 'TEST_ACTION' };
+      const updatedAction = { type: 'TEST_ACTION', isUpdated: true };
+      const updaters = [
+        createUpdater(),
+        createUpdater(),
+        createUpdater()
+      ];
+      const middleware = [
+        createMiddlware(),
+        createMiddlware((state, _, next) => next(state, updatedAction)),
+        createMiddlware()
+      ];
+      const store = Store.createStore({
+        initialState: {},
+        updaters,
+        middlware
+      });
+
+       // Perform Tests
+      return store.dispatch(initialAction).then(() => {
+        for(let i=0; i<middlware.length; i++) {
+          // Check if the middlware is passed the correct action
+          const { calls } = middlware[i].mock;
+          for(let j=0; j<calls.length; j++) {
+            const [ _, action ] = calls[j];
+
+            if(i === 0) expect(action).toEqual(initialAction);
+            else        expect(action).toEqual(updatedAction);
+          }
+
+          // Check if the updaters are passed the updated action
+          for(let j=0; j<updater.length; j++) {
+            const [ _, action ] = updater.mock.calls[j];
+
+            expect(action).toEqual(updatedAction);
+          }
+        }
       });
     });
 
