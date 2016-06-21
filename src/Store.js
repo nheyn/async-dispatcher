@@ -37,27 +37,20 @@ export default class Store<S> {
   /**
    * Update the Store by calling the actions in all the updaters.
    *
-   *  //TODO, return this (for === check) if no changes are made
-   *
    * @param action    {Object}          The action to pass to each of the updaters
-   * @param settings  {[Object]}        The settings for this dispatch
    *
    * @throws                            An error when the action is not a plain object
-   * @throws                            An error if skip is not a number or an invalid number to skip
    *
    * @return          {Promise<Store>}  A Promise with the new Store with the state after calling the updaters
    */
-  dispatch(action: Action, settings: StoreDispatchSettings<S> = {}): Promise<Store<S>> {
-    if(!action || typeof action !== 'object')                   throw new Error('actions must be objects');
-    if(settings.skip && typeof settings.skip !== 'number')      throw new Error('settings.skip must be a number');
-    if(settings.skip && settings.skip < 0)                      throw new Error('settings.skip must be positive');
-    if(settings.skip && settings.skip > this._updaters.count()) throw new Error('settings.skip is too large');
+  dispatch(action: Action): Promise<Store<S>> {
+    if(!action || typeof action !== 'object') throw new Error('actions must be objects');
 
-    const currState = settings.replaceState !== undefined? settings.replaceState: this._state;
-    const currUpdaters = settings.skip !== undefined? this._updaters.slice(settings.skip): this._updaters;
+    // Perform dispatch
+    const updatedStatePromise = dispatch(this._state, action, this._updaters);
 
     // Create new store from the new state
-    return dispatch(currState, action, currUpdaters).then((updatedState) => {
+    return updatedStatePromise.then((updatedState) => {
       // Check for valid state
       if(typeof updatedState === 'undefined') throw new Error('a state must be returned from each updater');
 
@@ -86,6 +79,8 @@ export default class Store<S> {
  * @return        {Promise<any>}    The updated state in a Promise
  */
 function dispatch<S>(state: S, action: Action, updaters: Immutable.List<Updater<S>>): Promise<S> {
+  //TODO, add middleware / plugins
+
   // Go through each updater (wrapped in a promise)
   return updaters.reduce((currStatePromise, updater, index) => {
     return currStatePromise.then((state) => {
