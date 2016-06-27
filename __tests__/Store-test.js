@@ -7,7 +7,7 @@ function createUpdater(finalState) {
   return jest.fn().mockImplementation((initialState) => finalState? finalState: initialState);
 }
 
-function createMiddlware(impl) {
+function createMiddleware(impl) {
   return jest.fn().mockImplementation(impl? impl: (state, action, next) => next(state, action));
 }
 
@@ -116,32 +116,32 @@ describe('Store', () => {
         createUpdater()
       ];
       const middleware = [
-        createMiddlware(),
-        createMiddlware(),
-        createMiddlware()
+        createMiddleware(),
+        createMiddleware(),
+        createMiddleware()
       ];
       const store = Store.createStore({
         initialState: {},
         updaters,
-        middlware
+        middleware
       });
 
        // Perform Tests
       return store.dispatch({ }).then(() => {
-        for(let i=0; i<middlware.length; i++) {
-          const { calls } = middlware[i].mock;
+        for(let i=0; i<middleware.length; i++) {
+          const { calls } = middleware[i].mock;
           expect(calls.length).toBe(updaters.length);
         }
       });
     });
 
-    pit('will call the middlware with stores state', () => {
+    pit('will call the middleware with stores state', () => {
       // Test Data
       const initialState = { data: 'test state' };
       const middleware = [
-        createMiddlware(),
-        createMiddlware(),
-        createMiddlware()
+        createMiddleware(),
+        createMiddleware(),
+        createMiddleware()
       ];
       const store = Store.createStore({
         initialState,
@@ -150,13 +150,13 @@ describe('Store', () => {
           createUpdater(),
           createUpdater()
         ],
-        middlware
+        middleware
       });
 
        // Perform Tests
       return store.dispatch({ }).then(() => {
-        for(let i=0; i<middlware.length; i++) {
-          const { calls } = middlware[i].mock;
+        for(let i=0; i<middleware.length; i++) {
+          const { calls } = middleware[i].mock;
           for(let j=0; j<calls.length; j++) {
             const [ state ] = calls[j];
 
@@ -166,13 +166,13 @@ describe('Store', () => {
       });
     });
 
-    pit('will call the middlware with dispatched action', () => {
+    pit('will call the middleware with dispatched action', () => {
       // Test Data
       const action = { type: 'TEST_ACTION' };
       const middleware = [
-        createMiddlware(),
-        createMiddlware(),
-        createMiddlware()
+        createMiddleware(),
+        createMiddleware(),
+        createMiddleware()
       ];
       const store = Store.createStore({
         initialState: {},
@@ -181,13 +181,13 @@ describe('Store', () => {
           createUpdater(),
           createUpdater()
         ],
-        middlware
+        middleware
       });
 
        // Perform Tests
       return store.dispatch(action).then(() => {
-        for(let i=0; i<middlware.length; i++) {
-          const { calls } = middlware[i].mock;
+        for(let i=0; i<middleware.length; i++) {
+          const { calls } = middleware[i].mock;
           for(let j=0; j<calls.length; j++) {
             const [ _, dispatchedAction ] = calls[j];
 
@@ -197,50 +197,10 @@ describe('Store', () => {
       });
     });
 
-    it('will have a next function, that can call the updaters and "lower" middlware with a modified state', () => {
+    pit('will have a next function, that calls the updaters and "lower" middleware with modified action/state', () => {
       // Test Data
       const initialState = { data: 'test state' };
       const updatedState = { data: 'modified test state' };
-      const updaters = [
-        createUpdater(),
-        createUpdater(),
-        createUpdater()
-      ];
-      const middleware = [
-        createMiddlware(),
-        createMiddlware((_, action, next) => next(updatedState, action)),
-        createMiddlware()
-      ];
-      const store = Store.createStore({
-        initialState,
-        updaters,
-        middlware
-      });
-
-       // Perform Tests
-      return store.dispatch({}).then(() => {
-        for(let i=0; i<middlware.length; i++) {
-          // Check if the middlware is passed the correct state
-          const { calls } = middlware[i].mock;
-          for(let j=0; j<calls.length; j++) {
-            const [ state ] = calls[j];
-
-            if(i === 0) expect(state).toEqual(initialState);
-            else        expect(state).toEqual(updatedState);
-          }
-
-          // Check if the updaters are passed the updated state
-          for(let j=0; j<updater.length; j++) {
-            const [ state ] = updater.mock.calls[j];
-
-            expect(state).toEqual(updatedState);
-          }
-        }
-      });
-    });
-
-    it('will have a next function, that can call the updaters and "lower" middlware  with a modified action', () => {
-      // Test Data
       const initialAction = { type: 'TEST_ACTION' };
       const updatedAction = { type: 'TEST_ACTION', isUpdated: true };
       const updaters = [
@@ -249,32 +209,38 @@ describe('Store', () => {
         createUpdater()
       ];
       const middleware = [
-        createMiddlware(),
-        createMiddlware((state, _, next) => next(state, updatedAction)),
-        createMiddlware()
+        createMiddleware((_, action, next) => next(updatedState, action)),
+        createMiddleware((state, _, next) => next(state, updatedAction)),
+        createMiddleware()
       ];
       const store = Store.createStore({
-        initialState: {},
+        initialState,
         updaters,
-        middlware
+        middleware
       });
 
        // Perform Tests
       return store.dispatch(initialAction).then(() => {
-        for(let i=0; i<middlware.length; i++) {
-          // Check if the middlware is passed the correct action
-          const { calls } = middlware[i].mock;
-          for(let j=0; j<calls.length; j++) {
-            const [ _, action ] = calls[j];
+        for(let m=0; m<middleware.length; m++) {
+          // Check if the middleware is passed the correct state / action
+          const { calls } = middleware[m].mock;
+          for(let c=0; c<calls.length; c++) {
+            const [ state, action ] = calls[c];
 
-            if(i === 0) expect(action).toEqual(initialAction);
-            else        expect(action).toEqual(updatedAction);
+            if(c === 0 && m <= 0) expect(state).toBe(initialState);
+            else                  expect(state).toBe(updatedState);
+
+            if(m <= 1)            expect(action).toBe(initialAction);
+            else                  expect(action).toBe(updatedAction);
           }
 
-          // Check if the updaters are passed the updated action
-          for(let j=0; j<updater.length; j++) {
-            const [ _, action ] = updater.mock.calls[j];
+          // Check if the updaters are passed the updated state
+          for(let u=0; u<updaters.length; u++) {
+            const { calls: updaterCalls } = updaters[u].mock;
+            expect(updaterCalls.length).toBe(1);
 
+            const [ state, action ] = updaterCalls[0];
+            expect(state).toEqual(updatedState);
             expect(action).toEqual(updatedAction);
           }
         }
@@ -317,7 +283,10 @@ describe('Store', () => {
         function() { },
         //{ error: function() {} }          //TODO, add deep checks
       ];
-      const store = Store.createStore({}, []);
+      const store = Store.createStore({
+        initialState: {},
+        updaters: []
+      });
 
       // Preform Tests
       actions.forEach((action) => {
