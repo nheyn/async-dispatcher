@@ -3,15 +3,21 @@
  */
 import Immutable from 'immutable';
 
+import asyncReduce from './utils/asyncReduce';
+import combineMiddleware from './utils/combineMiddleware';
+
 import type { Action, Middleware, StoreSpec, Updater } from 'async-dispatcher';
+
+type UpdaterList<S> = Immutable.List<Updater<S>>;
+type MiddlewareList<S> = Immutable.List<Middleware<S>>;
 
 /**
  * A store that uses updaters to dispatch changes to its state.
  */
 export default class Store<S> {
   _state: S;
-  _updaters: Immutable.List<Updater<S>>;
-  _middleware: Immutable.List<Middleware<S>>;
+  _updaters: UpdaterList<S>;
+  _middleware: MiddlewareList<S>;
 
   /**
    * Store constuctor (use Store.createStore).
@@ -20,7 +26,7 @@ export default class Store<S> {
    * @param updaters    {List<Updater>}     The updaters that can mutate the Store
    * @param middleware  {List<Middleware>}  The middleware functions to use
    */
-  constructor(state: S, updaters: Immutable.List<Updater<S>>, middleware: Immutable.List<Middleware<S>>) {
+  constructor(state: S, updaters: UpdaterList<S>, middleware: MiddlewareList<S>) {
     this._state = state;
     this._updaters = updaters;
     this._middleware = middleware;
@@ -91,39 +97,13 @@ export default class Store<S> {
  *
  * @return        {Promise<any>}    The updated state in a Promise
  */
-function dispatch<S>(
-  state: S,
-  action: Action,
-  updaters: Immutable.List<Updater<S>>,
-  middleware: Immutable.List<Middleware<S>>
-): Promise<S> {
+function dispatch<S>(state: S, action: Action, updaters: UpdaterList<S>, middleware: MiddlewareList<S>): Promise<S> {
   // Go through each updater
   return asyncReduce(updaters, (currState, updater, index) => {
-    // Add middleware to updater //TODO, add dispatch/updater specific middleware)
-    const currMiddleware = Immutable.List([]).concat(middleware);
-    const updaterWithMiddleware = combineMiddleware(currMiddleware, updater);
+    // Apply middlware to updater (not sure why type annotation is needed)
+    const updaterWithMiddleware: Updater<S> = combineMiddleware(middleware, updater);
 
     // Call current updater
     return updaterWithMiddleware(currState, action);
   }, state);
-}
-
-function combineMiddleware<S>(middlewareList: Immutable.List<Middleware<S>>, updater: Updater<S>): Updater<S> {
-  return middlewareList.reverse().reduce((next, middleware) => (stateMaybePromise, action) => {
-    return Promise.resolve(stateMaybePromise).then((state) => middleware(state, action, next));
-  }, updater);
-}
-
-function asyncReduce<V, R>(
-  list: Immutable.List<V>,
-  reducer: (reduction: R, value: V, index: number) => R | Promise<R>,
-  initialReduction?: R | Promise<R>
-): Promise<R> {
-  return list.reduce((reductionPromise, value, index) => {
-    return reductionPromise.then((reduction) => {
-      return Promise.resolve(
-        reducer(reduction, value, index)
-      );
-    });
-  }, Promise.resolve(initialReduction));
 }
