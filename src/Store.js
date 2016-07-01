@@ -7,6 +7,7 @@ import asyncReduce from './utils/asyncReduce';
 import combineMiddleware from './utils/combineMiddleware';
 
 import type { Action, Middleware, StoreSpec, Updater } from 'async-dispatcher';
+import type { CombinedUpdater } from './utils/combineMiddleware';
 
 type UpdaterList<S> = Immutable.List<Updater<S>>;
 type MiddlewareList<S> = Immutable.List<Middleware<S>>;
@@ -91,17 +92,20 @@ export default class Store<S> {
 /**
  * Perform a dispatch using the given updaters.
  *
- * @param state   {any}             The initial state to send through the updaters
- * @param action  {Action}          The action to pass to the updaters
- * @param updater {List<Updaters>}  The updaters to call
+ * @param state       {any}               The initial state to send through the updaters
+ * @param action      {Action}            The action to pass to the updaters
+ * @param updater     {List<Updaters>}    The updaters to call
+ * @param middleware  {List<Middleware>}  The middlware to use
  *
  * @return        {Promise<any>}    The updated state in a Promise
  */
 function dispatch<S>(state: S, action: Action, updaters: UpdaterList<S>, middleware: MiddlewareList<S>): Promise<S> {
   // Go through each updater
   return asyncReduce(updaters, (currState, updater, index) => {
-    // Apply middlware to updater (not sure why type annotation is needed)
-    const updaterWithMiddleware: Updater<S> = combineMiddleware(middleware, updater);
+    const plugins = {}; //TODO
+
+    // Apply middleware to updater (not sure why type annotation is needed)
+    const updaterWithMiddleware: CombinedUpdater<S> = combineMiddleware(middleware, updater, plugins);
 
     // Call current updater
     return updaterWithMiddleware(currState, action);

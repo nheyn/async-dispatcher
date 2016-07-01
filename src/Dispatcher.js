@@ -132,12 +132,14 @@ export default class Dispatcher {
     newStoresPromise.then((newStores) => {
       this._setStores(newStores);
 
-      this._asyncTracker.resolveFor(action, this);
-    }).catch((err) => {
-      this._asyncTracker.rejectFor(action, err);
+      this._asyncTracker = this._asyncTracker.resolveFor(action, this);
+    }, (err) => {                                                //NOTE, not using catch so error from ^ is caught v
+      this._asyncTracker = this._asyncTracker.rejectFor(action, err);
     }).then(() => {
       // Start next dispatch if there are actions left in the queue
       if(!this._actions.isEmpty()) this._dispatchActionFromQueue();
+    }).catch((err) => {
+      console.error(`Error during dispatch of ${JSON.stringify(action)}`, err);
     });
   }
 

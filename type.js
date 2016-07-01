@@ -5,9 +5,10 @@ declare module 'async-dispatcher' {
   declare type Subscriber<S> = (state: S) => void;
   declare type UnsubscibeFunc = () => void;
 
-  declare type Updater<S> = (state: S, action: Action) => S | Promise<S>;
-  declare type NextUpdater<S> = (state: S, action: Action) => Promise<S>;
-  declare type Middleware<S> = (state: S, action: Action, next: NextUpdater<S>) => Promise<S>;
+  declare type Plugins = Object;
+  declare type Updater<S> = (state: S, action: Action, plugins: Plugins) => S | Promise<S>;
+  declare type NextUpdater<S> = (state: S, action: Action, plugins: Plugins) => Promise<S>;
+  declare type Middleware<S> = (state: S, action: Action, plugins: Plugins, next: NextUpdater<S>) => Promise<S>;
 
   declare type StoreSpec<S> = {
     initialState: S,
