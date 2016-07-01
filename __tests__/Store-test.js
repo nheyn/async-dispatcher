@@ -8,7 +8,7 @@ function createUpdater(finalState) {
 }
 
 function createMiddleware(impl) {
-  return jest.fn().mockImplementation(impl? impl: (state, action, next) => next(state, action));
+  return jest.fn().mockImplementation(impl? impl: (state, action, plugins, next) => next(state, action, plugins));
 }
 
 describe('Store', () => {
@@ -86,6 +86,54 @@ describe('Store', () => {
 
           const [dispatchedState] = calls[0];
           expect(dispatchedState).toBe(updatedStates[i]);
+        }
+      });
+    });
+
+    pit('will call the updaters with a plugins object', () => {
+      // Test Data
+      const updaters = [
+        createUpdater(),
+        createUpdater(),
+        createUpdater()
+      ];
+      const store = Store.createStore({
+        initialState: {},
+        updaters
+      });
+
+      // Perform Tests
+      return store.dispatch({}).then(() => {
+        for(let u=0; u<updaters.length; u++) {
+          const { calls } = updaters[u].mock;
+          expect(calls.length).toBe(1);
+
+          const [ _, __, plugins ] = calls[0];
+          expect(plugins).toBeDefined();
+        }
+      });
+    });
+
+    pit('will call the updaters with the getIndex plugin, that returns the current index of the updater', () => {
+      // Test Data
+      const updaters = [
+        createUpdater(),
+        createUpdater(),
+        createUpdater()
+      ];
+      const store = Store.createStore({
+        initialState: {},
+        updaters
+      });
+
+      // Perform Tests
+      return store.dispatch({}).then(() => {
+        for(let u=0; u<updaters.length; u++) {
+          const { calls } = updaters[u].mock;
+          expect(calls.length).toBe(1);
+
+          const [ _, __, plugins ] = calls[0];
+          expect(plugins.getIndex()).toEqual(u);
         }
       });
     });
@@ -197,20 +245,25 @@ describe('Store', () => {
       });
     });
 
-    pit('will have a next function, that calls the updaters and "lower" middleware with modified action/state', () => {
+    pit('will have middleware with next(), that calls updaters/middleware with updated action/state/plugins', () => {
       // Test Data
       const initialState = { data: 'test state' };
       const updatedState = { data: 'modified test state' };
       const initialAction = { type: 'TEST_ACTION' };
       const updatedAction = { type: 'TEST_ACTION', isUpdated: true };
+      const updatedPlugin = { test: 'plugin' };
       const updaters = [
         createUpdater(),
         createUpdater(),
         createUpdater()
       ];
       const middleware = [
-        createMiddleware((_, action, next) => next(updatedState, action)),
-        createMiddleware((state, _, next) => next(state, updatedAction)),
+        createMiddleware((_, action, plugins, next) => next(updatedState, action, plugins)),
+        createMiddleware((state, _, plugins, next) => next(state, updatedAction, plugins)),
+        createMiddleware((state, action, plugins, next) => {
+          plugins.testPlugin = updatedPlugin;
+          return next(state, updatedAction, plugins);
+        }),
         createMiddleware()
       ];
       const store = Store.createStore({
@@ -225,24 +278,30 @@ describe('Store', () => {
           // Check if the middleware is passed the correct state / action
           const { calls } = middleware[m].mock;
           for(let c=0; c<calls.length; c++) {
-            const [ state, action ] = calls[c];
+            const [ state, action, plugins ] = calls[c];
 
             if(c === 0 && m <= 0) expect(state).toBe(initialState);
             else                  expect(state).toBe(updatedState);
 
             if(m <= 1)            expect(action).toBe(initialAction);
             else                  expect(action).toBe(updatedAction);
-          }
 
-          // Check if the updaters are passed the updated state
-          for(let u=0; u<updaters.length; u++) {
-            const { calls: updaterCalls } = updaters[u].mock;
-            expect(updaterCalls.length).toBe(1);
-
-            const [ state, action ] = updaterCalls[0];
-            expect(state).toEqual(updatedState);
-            expect(action).toEqual(updatedAction);
+            //NOTE, can't check before/after because plugins is mutable
+            if(m > 2)             expect(plugins.testPlugin).toBe(updatedPlugin);
+            //if(m <= 2)            expect(plugins.testPlugin).toBeUndefined();
+            //else                  expect(plugins.testPlugin).toBe(updatedPlugin);
           }
+        }
+
+        // Check if the updaters are passed the updated state
+        for(let u=0; u<updaters.length; u++) {
+          const { calls } = updaters[u].mock;
+          expect(calls.length).toBe(1);
+
+          const [ state, action, plugins ] = calls[0];
+          expect(state).toEqual(updatedState);
+          expect(action).toEqual(updatedAction);
+          expect(plugins.testPlugin).toBe(updatedPlugin);
         }
       });
     });
