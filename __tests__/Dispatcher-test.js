@@ -163,6 +163,83 @@ describe('Dispatcher', () => {
         });
       });
     });
+
+    pit('will use middleware that adds plugin getStoreName, that returns the name of the Store', () => {
+      // Test Data
+      const stores = {
+        storeA: createStore({}),
+        storeB: createStore({}),
+        storeC: createStore({})
+      };
+      const dispatcher = Dispatcher.createDispatcher(stores);
+
+      // Perform Test
+      return dispatcher.dispatch({}).catch(() => {
+        for(let storeName in stores) {
+          const { calls } = stores[storeName].dispatch.mock;
+          expect(calls.length).toEqual(1);
+
+          const [ _, middleware ] = calls[0];
+          //TODO, how to test middlware ???
+        }
+      });
+    });
+
+    pit('will use middleware that adds plugin getCurrentState, that returns current state of the Store', () => {
+      // Test Data
+      const initialStates = {
+        storeA: { data: 'a', state: 'initial' },
+        storeB: { data: 'b', state: 'initial' },
+        storeC: { data: 'c', state: 'initial' }
+      };
+      const stores = {
+        storeA: createStore(initialStates.storeA),
+        storeB: createStore(initialStates.storeB),
+        storeC: createStore(initialStates.storeC)
+      };
+      const dispatcher = Dispatcher.createDispatcher(stores);
+
+      // Perform Test
+      return dispatcher.dispatch({}).catch(() => {
+        for(let storeName in stores) {
+          const { calls } = stores[storeName].dispatch.mock;
+          expect(calls.length).toEqual(1);
+
+          const [ _, middleware ] = calls[0];
+          //TODO, how to test middlware ???
+        }
+      });
+    });
+
+    pit('will use middleware that adds plugin pause, which lets actions dispatch while waiting for a promise', () => {
+      // Test Data
+      const stores = {
+        storeA: createStore({}),
+        storeB: createStore({}),
+        storeC: createStore({})
+      };
+      const dispatcher = Dispatcher.createDispatcher(stores);
+
+      // Perform Test
+      return dispatcher.dispatch({}).catch(() => {
+        //TODO, how to test pause ???
+      });
+    });
+
+    pit('will use middleware that adds plugin dispatch, that pauses while waiting for the results', () => {
+      // Test Data
+      const stores = {
+        storeA: createStore({}),
+        storeB: createStore({}),
+        storeC: createStore({})
+      };
+      const dispatcher = Dispatcher.createDispatcher(stores);
+
+      // Perform Test
+      return dispatcher.dispatch({}).catch(() => {
+        //TODO, how to test pause ???
+      });
+    });
   });
 
   describe('getStateFor(...)', () => {
