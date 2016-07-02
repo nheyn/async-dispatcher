@@ -114,7 +114,7 @@ describe('Store', () => {
       });
     });
 
-    pit('will call the updaters with the getIndex plugin, that returns the current index of the updater', () => {
+    pit('will call the updaters with the getUpdaterIndex plugin, that returns the current index of the updater', () => {
       // Test Data
       const updaters = [
         createUpdater(),
@@ -133,7 +133,7 @@ describe('Store', () => {
           expect(calls.length).toBe(1);
 
           const [ _, __, plugins ] = calls[0];
-          expect(plugins.getIndex()).toEqual(u);
+          expect(plugins.getUpdaterIndex()).toEqual(u);
         }
       });
     });

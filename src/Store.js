@@ -95,14 +95,19 @@ export default class Store<S> {
  * @param state       {any}               The initial state to send through the updaters
  * @param action      {Action}            The action to pass to the updaters
  * @param updater     {List<Updaters>}    The updaters to call
- * @param middleware  {List<Middleware>}  The middlware to use
+ * @param middleware  {List<Middleware>}  The middleware to use
  *
  * @return        {Promise<any>}    The updated state in a Promise
  */
 function dispatch<S>(state: S, action: Action, updaters: UpdaterList<S>, middleware: MiddlewareList<S>): Promise<S> {
   // Go through each updater
   return asyncReduce(updaters, (currState, updater, index) => {
-    const plugins = {}; //TODO
+    // Built in plugins
+    const plugins = {
+      getUpdaterIndex(): number {
+        return index;
+      }
+    };
 
     // Apply middleware to updater (not sure why type annotation is needed)
     const updaterWithMiddleware: CombinedUpdater<S> = combineMiddleware(middleware, updater, plugins);
