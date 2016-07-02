@@ -163,11 +163,24 @@ describe('middleware', () => {
       });
     });
 
-    it('', () => {
-      //TODO, how to test pause
+    pit('will use pause middleware to return value state after dispatch', () => {
       // Test Data
+      const dispatchedAction = { type: 'TEST_ACTION' };
+      const finalState = { data: 'state' };
+      const pause = jest.fn().mockImplementation((promise) => promise);
+      const getCurrentState = jest.fn().mockReturnValue(finalState);
+
+      const middleware = createDispatchMiddleware();
 
       // Perform Test
+      /*return middleware({}, {}, { pause, getCurrentState }, (_, __, { dispatch }) => {
+        return dispatch(dispatchedAction);
+      }).then((state) => {
+        const { calls } = pause.mock;
+        expect(calls.length).toBe(1);
+
+        //TODO, how to test
+      });*/
     });
   });
 });
