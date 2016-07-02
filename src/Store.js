@@ -42,7 +42,7 @@ export default class Store<S> {
    *          middleware    {Array<Middleware>} The middleware functions to use
    *        }
    *
-   * @return                {Store} The new Store
+   * @return                {Store}             The new Store
    */
   static createStore({ initialState, updaters, middleware }: StoreSpec<S>): Store<S> {
     if(initialState === 'undefined')              throw new Error('An initialState is required to create a Store');
@@ -55,17 +55,21 @@ export default class Store<S> {
   /**
    * Update the Store by calling the actions in all the updaters.
    *
-   * @param action    {Object}          The action to pass to each of the updaters
+   * @param action      {Object}            The action to pass to each of the updaters
+   * @param middleware  {List<Middleware>}  The middleware to use
    *
-   * @throws                            An error when the action is not a plain object
+   * @throws                                An error when the action is not a plain object
    *
-   * @return          {Promise<Store>}  A Promise with the new Store with the state after calling the updaters
+   * @return            {Promise<Store>}    A Promise with the new Store with the state after calling the updaters
    */
-  dispatch(action: Action): Promise<Store<S>> {
+  dispatch(action: Action, middleware?: MiddlewareList<S>): Promise<Store<S>> {
     if(!action || typeof action !== 'object') throw new Error('actions must be objects');
 
+    // Get all middleware for current dispatch
+    const currMiddleware = middleware? middleware.concat(this._middleware): this._middleware;
+
     // Perform dispatch
-    const updatedStatePromise = dispatch(this._state, action, this._updaters, this._middleware);
+    const updatedStatePromise = dispatch(this._state, action, this._updaters, currMiddleware);
 
     // Create new store from the new state
     return updatedStatePromise.then((updatedState) => {
@@ -97,22 +101,22 @@ export default class Store<S> {
  * @param updater     {List<Updaters>}    The updaters to call
  * @param middleware  {List<Middleware>}  The middleware to use
  *
- * @return        {Promise<any>}    The updated state in a Promise
+ * @return            {Promise<any>}      The updated state in a Promise
  */
 function dispatch<S>(state: S, action: Action, updaters: UpdaterList<S>, middleware: MiddlewareList<S>): Promise<S> {
+  const createUpdater = (updater, index) => {
+    // Built in plugins
+    const initPlugins = { getUpdaterIndex: () => index };
+
+    // Apply middleware to updater
+    return combineMiddleware(middleware, updater, initPlugins);
+  };
+
   // Go through each updater
   return asyncReduce(updaters, (currState, updater, index) => {
-    // Built in plugins
-    const plugins = {
-      getUpdaterIndex(): number {
-        return index;
-      }
-    };
+    // Call updater with middleware/plugins for this dispatch/updater (not sure why type is neeed ???)
+    const currUpdater: CombinedUpdater<S> = createUpdater(updater, index);
 
-    // Apply middleware to updater (not sure why type annotation is needed)
-    const updaterWithMiddleware: CombinedUpdater<S> = combineMiddleware(middleware, updater, plugins);
-
-    // Call current updater
-    return updaterWithMiddleware(currState, action);
+    return currUpdater(currState, action);
   }, state);
 }
