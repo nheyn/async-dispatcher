@@ -2,8 +2,15 @@ jest.unmock('../src/Dispatcher');
 
 import Immutable from 'immutable';
 import Store from '../src/Store';
+import {
+  createGetStoreNameMiddleware,
+  createGetCurrentStateMiddleware,
+  createPauseMiddleware,
+  createDispatchMiddleware
+} from '../src/middleware';
 import Dispatcher from '../src/Dispatcher';
 
+// Set up mocks
 function createStore(initialState) {
   const store = new Store(initialState);
 
@@ -12,6 +19,16 @@ function createStore(initialState) {
 
   return store;
 }
+
+const getStoreName = jest.fn().mockImplementation((s, a, p, next) => next(s, a, p));
+const getCurrentState = jest.fn().mockImplementation((s, a, p, next) => next(s, a, p));
+const pause = jest.fn().mockImplementation((s, a, p, next) => next(s, a, p));
+const dispatch = jest.fn().mockImplementation((s, a, p, next) => next(s, a, p));
+
+createGetStoreNameMiddleware.mockReturnValue(getStoreName);
+createGetCurrentStateMiddleware.mockReturnValue(getCurrentState);
+createPauseMiddleware.mockReturnValue(pause);
+createDispatchMiddleware.mockReturnValue(dispatch);
 
 describe('Dispatcher', () => {
   describe('dispatch(...)', () => {
@@ -164,7 +181,9 @@ describe('Dispatcher', () => {
       });
     });
 
-    pit('will use middleware that adds plugin getStoreName, that returns the name of the Store', () => {
+    pit('will use middleware that adds plugin getStoreName', () => {
+      createGetStoreNameMiddleware.mockClear();
+
       // Test Data
       const stores = {
         storeA: createStore({}),
@@ -174,18 +193,22 @@ describe('Dispatcher', () => {
       const dispatcher = Dispatcher.createDispatcher(stores);
 
       // Perform Test
-      return dispatcher.dispatch({}).catch(() => {
+      return dispatcher.dispatch({}).then(() => {
+        expect(createGetStoreNameMiddleware).toBeCalled();
+
         for(let storeName in stores) {
           const { calls } = stores[storeName].dispatch.mock;
           expect(calls.length).toEqual(1);
 
           const [ _, middleware ] = calls[0];
-          //TODO, how to test middlware ???
+          expect(middleware).toContain(getStoreName);
         }
       });
     });
 
-    pit('will use middleware that adds plugin getCurrentState, that returns current state of the Store', () => {
+    pit('will use middleware that adds plugin getCurrentState', () => {
+      createGetCurrentStateMiddleware.mockClear();
+
       // Test Data
       const initialStates = {
         storeA: { data: 'a', state: 'initial' },
@@ -200,18 +223,22 @@ describe('Dispatcher', () => {
       const dispatcher = Dispatcher.createDispatcher(stores);
 
       // Perform Test
-      return dispatcher.dispatch({}).catch(() => {
+      return dispatcher.dispatch({}).then(() => {
+        expect(createGetCurrentStateMiddleware).toBeCalled();
+
         for(let storeName in stores) {
           const { calls } = stores[storeName].dispatch.mock;
           expect(calls.length).toEqual(1);
 
           const [ _, middleware ] = calls[0];
-          //TODO, how to test middlware ???
+          expect(middleware).toContain(getCurrentState);
         }
       });
     });
 
-    pit('will use middleware that adds plugin pause, which lets actions dispatch while waiting for a promise', () => {
+    pit('will use middleware that adds plugin pause', () => {
+      createPauseMiddleware.mockClear();
+
       // Test Data
       const stores = {
         storeA: createStore({}),
@@ -221,12 +248,20 @@ describe('Dispatcher', () => {
       const dispatcher = Dispatcher.createDispatcher(stores);
 
       // Perform Test
-      return dispatcher.dispatch({}).catch(() => {
-        //TODO, how to test pause ???
+      return dispatcher.dispatch({}).then(() => {
+        expect(createDispatchMiddleware).toBeCalled();
+
+        for(let storeName in stores) {
+          const { calls } = stores[storeName].dispatch.mock;
+          expect(calls.length).toEqual(1);
+
+          const [ _, middleware ] = calls[0];
+          expect(middleware).toContain(pause);
+        }
       });
     });
 
-    pit('will use middleware that adds plugin dispatch, that pauses while waiting for the results', () => {
+    pit('will use middleware that adds plugin dispatch', () => {
       // Test Data
       const stores = {
         storeA: createStore({}),
@@ -236,8 +271,14 @@ describe('Dispatcher', () => {
       const dispatcher = Dispatcher.createDispatcher(stores);
 
       // Perform Test
-      return dispatcher.dispatch({}).catch(() => {
-        //TODO, how to test pause ???
+      return dispatcher.dispatch({}).then(() => {
+        for(let storeName in stores) {
+          const { calls } = stores[storeName].dispatch.mock;
+          expect(calls.length).toEqual(1);
+
+          const [ _, middleware ] = calls[0];
+          expect(middleware).toContain(dispatch);
+        }
       });
     });
   });
