@@ -156,14 +156,19 @@ describe('Store', () => {
       });
     });
 
-    pit('will call all the middleware in the store for each updater', () => {
+    pit('will call all the middleware in the store / passed to the dispatch method for each updater', () => {
       // Test Data
       const updaters = [
         createUpdater(),
         createUpdater(),
         createUpdater()
       ];
-      const middleware = [
+      const storeMiddleware = [
+        createMiddleware(),
+        createMiddleware(),
+        createMiddleware()
+      ];
+      const dispatchMiddleware = [
         createMiddleware(),
         createMiddleware(),
         createMiddleware()
@@ -171,13 +176,71 @@ describe('Store', () => {
       const store = Store.createStore({
         initialState: {},
         updaters,
-        middleware
+        middleware: storeMiddleware
+      });
+
+       // Perform Tests
+      return store.dispatch({ }, Immutable.List(dispatchMiddleware)).then(() => {
+        for(let i=0; i<storeMiddleware.length; i++) {
+          const { calls } = storeMiddleware[i].mock;
+          expect(calls.length).toBe(updaters.length);
+        }
+
+        for(let i=0; i<dispatchMiddleware.length; i++) {
+          const { calls } = dispatchMiddleware[i].mock;
+          expect(calls.length).toBe(updaters.length);
+        }
+      });
+    });
+
+    pit('will call all the middleware in the store for each updater', () => {
+      // Test Data
+      const updaters = [
+        createUpdater(),
+        createUpdater(),
+        createUpdater()
+      ];
+      const storeMiddleware = [
+        createMiddleware(),
+        createMiddleware(),
+        createMiddleware()
+      ];
+      const store = Store.createStore({
+        initialState: {},
+        updaters,
+        middleware: storeMiddleware
       });
 
        // Perform Tests
       return store.dispatch({ }).then(() => {
-        for(let i=0; i<middleware.length; i++) {
-          const { calls } = middleware[i].mock;
+        for(let i=0; i<storeMiddleware.length; i++) {
+          const { calls } = storeMiddleware[i].mock;
+          expect(calls.length).toBe(updaters.length);
+        }
+      });
+    });
+
+    pit('will call all the middleware passed to the dispatch method for each updater', () => {
+      // Test Data
+      const updaters = [
+        createUpdater(),
+        createUpdater(),
+        createUpdater()
+      ];
+      const dispatchMiddleware = [
+        createMiddleware(),
+        createMiddleware(),
+        createMiddleware()
+      ];
+      const store = Store.createStore({
+        initialState: {},
+        updaters
+      });
+
+       // Perform Tests
+      return store.dispatch({ }, Immutable.List(dispatchMiddleware)).then(() => {
+        for(let i=0; i<dispatchMiddleware.length; i++) {
+          const { calls } = dispatchMiddleware[i].mock;
           expect(calls.length).toBe(updaters.length);
         }
       });
@@ -186,7 +249,13 @@ describe('Store', () => {
     pit('will call the middleware with stores state', () => {
       // Test Data
       const initialState = { data: 'test state' };
-      const middleware = [
+      const dispatchedAction = { type: 'TEST_ACTION' };
+      const storeMiddleware = [
+        createMiddleware(),
+        createMiddleware(),
+        createMiddleware()
+      ];
+      const dispatchMiddleware = [
         createMiddleware(),
         createMiddleware(),
         createMiddleware()
@@ -198,48 +267,28 @@ describe('Store', () => {
           createUpdater(),
           createUpdater()
         ],
-        middleware
+        middleware: storeMiddleware
       });
 
        // Perform Tests
-      return store.dispatch({ }).then(() => {
-        for(let i=0; i<middleware.length; i++) {
-          const { calls } = middleware[i].mock;
+      return store.dispatch(dispatchedAction, Immutable.List(dispatchMiddleware)).then(() => {
+        for(let i=0; i<storeMiddleware.length; i++) {
+          const { calls } = storeMiddleware[i].mock;
           for(let j=0; j<calls.length; j++) {
-            const [ state ] = calls[j];
+            const [ state, action ] = calls[j];
 
             expect(state).toEqual(initialState);
+            expect(action).toEqual(dispatchedAction);
           }
         }
-      });
-    });
 
-    pit('will call the middleware with dispatched action', () => {
-      // Test Data
-      const action = { type: 'TEST_ACTION' };
-      const middleware = [
-        createMiddleware(),
-        createMiddleware(),
-        createMiddleware()
-      ];
-      const store = Store.createStore({
-        initialState: {},
-        updaters: [
-          createUpdater(),
-          createUpdater(),
-          createUpdater()
-        ],
-        middleware
-      });
-
-       // Perform Tests
-      return store.dispatch(action).then(() => {
-        for(let i=0; i<middleware.length; i++) {
-          const { calls } = middleware[i].mock;
+        for(let i=0; i<dispatchMiddleware.length; i++) {
+          const { calls } = storeMiddleware[i].mock;
           for(let j=0; j<calls.length; j++) {
-            const [ _, dispatchedAction ] = calls[j];
+            const [ state, action ] = calls[j];
 
-            expect(dispatchedAction).toBe(action);
+            expect(state).toEqual(initialState);
+            expect(action).toEqual(dispatchedAction);
           }
         }
       });
@@ -257,9 +306,13 @@ describe('Store', () => {
         createUpdater(),
         createUpdater()
       ];
-      const middleware = [
+      const dispatchMiddleware = [
         createMiddleware((_, action, plugins, next) => next(updatedState, action, plugins)),
         createMiddleware((state, _, plugins, next) => next(state, updatedAction, plugins)),
+        createMiddleware()
+      ];
+      const storeMiddleware = [
+        createMiddleware(),
         createMiddleware((state, action, plugins, next) => {
           plugins.testPlugin = updatedPlugin;
           return next(state, updatedAction, plugins);
@@ -269,14 +322,17 @@ describe('Store', () => {
       const store = Store.createStore({
         initialState,
         updaters,
-        middleware
+        middleware: storeMiddleware
       });
 
-       // Perform Tests
-      return store.dispatch(initialAction).then(() => {
-        for(let m=0; m<middleware.length; m++) {
+      // Perform Tests
+      return store.dispatch(initialAction, Immutable.List(dispatchMiddleware)).then(() => {
+        for(let m=0; m<dispatchMiddleware.length + storeMiddleware.length; m++) {
           // Check if the middleware is passed the correct state / action
-          const { calls } = middleware[m].mock;
+          const { calls } = m < dispatchMiddleware.length?
+                                  dispatchMiddleware[m].mock:
+                                  storeMiddleware[m - dispatchMiddleware.length].mock;
+
           for(let c=0; c<calls.length; c++) {
             const [ state, action, plugins ] = calls[c];
 
@@ -287,7 +343,7 @@ describe('Store', () => {
             else                  expect(action).toBe(updatedAction);
 
             //NOTE, can't check before/after because plugins is mutable
-            if(m > 2)             expect(plugins.testPlugin).toBe(updatedPlugin);
+            if(m > 4)             expect(plugins.testPlugin).toBe(updatedPlugin);
             //if(m <= 2)            expect(plugins.testPlugin).toBeUndefined();
             //else                  expect(plugins.testPlugin).toBe(updatedPlugin);
           }
