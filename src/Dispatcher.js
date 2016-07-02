@@ -3,15 +3,22 @@
  */
 import Immutable from 'immutable';
 
+import {
+  createGetStoreNameMiddleware,
+  createGetCurrentStateMiddleware,
+  createPauseMiddleware,
+  createDispatchMiddleware
+} from './middleware';
 import Queue from './utils/Queue';
 import AsyncTracker from './utils/AsyncTracker';
 import mapOfPromisesToMapPromise from './utils/mapOfPromisesToMapPromise';
 
-import type { Action, Subscriber, UnsubscibeFunc } from 'async-dispatcher';
+import type { Action, Middleware, Subscriber, UnsubscibeFunc } from 'async-dispatcher';
 import type Store from './Store';
 
 type StoresMap = Immutable.Map<string, Store<any>>;
 type SubscriberMap = Immutable.Map<string, Immutable.Set<Subscriber>>;
+type MiddlewareList = Immutable.List<Middleware<any>>;
 
 /**
  * A class that contains a group of stores that should all receive the same actions.
@@ -126,7 +133,7 @@ export default class Dispatcher {
     this._actions = queue;
 
     // Perform dispatch on each store
-    const newStoresPromise = dispatch(action, this._stores);
+    const newStoresPromise = dispatch(action, this._stores, this._getDefaultMiddleware());
 
     // Handle the updated states
     newStoresPromise.then((newStores) => {
@@ -172,20 +179,32 @@ export default class Dispatcher {
       hasUnsubscribed = true;
     };
   }
+
+  _getDefaultMiddleware(): MiddlewareList {
+    return Immutable.List([
+      createGetCurrentStateMiddleware(this),
+      createPauseMiddleware(),
+      createDispatchMiddleware(this)
+    ]);
+  }
 }
 
 /**
  * Dispatch the action to each of the stores.
  *
- * @param action  {Action}                The action to perform
- * @param stores  {Map<Store>}            The stores to perform the action on
+ * @param action      {Action}                The action to perform
+ * @param stores      {Map<Store>}            The stores to perform the action on
+ * @param middleware  {List<Middleware>}      The middleware to use
  *
- * @return        {Promise<Map<Stores>>}  A promise that resolves to a map of stores after the given action
+ * @return            {Promise<Map<Stores>>}  A promise that resolves to a map of stores after the given action
  */
-function dispatch(action: Action, stores: StoresMap): Promise<StoresMap> {
+function dispatch(action: Action, stores: StoresMap, middleware: MiddlewareList): Promise<StoresMap> {
   // Call dispatch on each store
-  const storePromises = stores.map((store) => {
-    return store.dispatch(action);
+  const storePromises = stores.map((store, storeName) => {
+    const getStoreNameMiddleware = createGetStoreNameMiddleware(storeName);
+    const currMiddleware = middleware.unshift(getStoreNameMiddleware);
+
+    return store.dispatch(action, currMiddleware);
   });
 
   return mapOfPromisesToMapPromise(storePromises);
