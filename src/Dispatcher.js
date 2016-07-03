@@ -19,6 +19,9 @@ import type Store from './Store';
 type StoresMap = Immutable.Map<string, Store<any>>;
 type SubscriberMap = Immutable.Map<string, Immutable.Set<Subscriber>>;
 type MiddlewareList = Immutable.List<Middleware<any>>;
+type QueuedDispatch = (stores: StoresMap) => Promise<StoresMap>;
+
+const DISPATCH_ERROR = new Error('Error thrown during dispatch');
 
 /**
  * A class that contains a group of stores that should all receive the same actions.
@@ -26,27 +29,29 @@ type MiddlewareList = Immutable.List<Middleware<any>>;
 export default class Dispatcher {
   _stores: StoresMap;
   _subscribers: SubscriberMap;
-  _actions: Queue<Action>;
-  _asyncTracker: AsyncTracker<Action, Dispatcher>;
+  _dispatchQueue: Queue<QueuedDispatch>;
+  _asyncTracker: AsyncTracker<Action, Dispatcher>;    //NOTE, assume every action is a diffrent object (no global const)
 
   /**
    * Constructor for the Dispatcher.
    *
-   * @param initialStores       {Immutable.Map<Store>}                          The initial stores
-   * @param initialSubscribers  {Immutable.Map<Immutable.Set<(any) => void>>}   The initial subscribers
+   * @param initialStores         {Immutable.Map<Store>}                          The initial stores
+   * @param initialSubscribers    {Immutable.Map<Immutable.Set<(any) => void>>}   The initial subscribers
+   * @param initialDispatchQueue  {Queue<QueuedDispatch>}                         The initial dispatches to call
+   * @param initialAsyncTrack     {AsyncTracker}                                  The initial async track, for ^
    */
   constructor(
     initialStores: StoresMap,
     initialSubscribers: SubscriberMap,
-    initialActions: Queue<Action>,
+    initialDispatchQueue: Queue<QueuedDispatch>,
     initialAsyncTracker: AsyncTracker
   ) {
     this._stores = initialStores;
     this._subscribers = initialSubscribers;
-    this._actions = initialActions;
+    this._dispatchQueue = initialDispatchQueue;
     this._asyncTracker = initialAsyncTracker;
 
-    if(!this._actions.isEmpty()) this._dispatchActionFromQueue();
+    if(!this._dispatchQueue.isEmpty()) this._dispatchFromQueue();
   }
 
   /**
@@ -75,19 +80,12 @@ export default class Dispatcher {
    * @return        {Promise<{string: any}>}  The states after the dispatch is finished
    */
   dispatch(action: Action): Promise<Dispatcher> {
-    const shouldStartDispatch = this._actions.isEmpty();
+    const shouldStartDispatch = this._dispatchQueue.isEmpty();
 
-    // Enqueue given action
-    this._actions = this._actions.enqueue(action);
+    const finishedDispatchPromise = this._addActionToQueue(action);
+    if(shouldStartDispatch) this._dispatchFromQueue();
 
-    // Start dispatch if needed
-    if(shouldStartDispatch) this._dispatchActionFromQueue();
-
-    // Return a promise that resolves when the given action finishes dispatching
-    const { tracker, promise } = this._asyncTracker.waitFor(action);
-    this._asyncTracker = tracker;
-
-    return promise;
+    return finishedDispatchPromise;
   }
 
   /**
@@ -119,50 +117,102 @@ export default class Dispatcher {
       throw new Error(`Cannot subscribe: "${storeName}" dose not exist`);
     }
 
-    // Add to list of subscribe for given store
-    const currSubscribers = this._subscribers.get(storeName);
-    this._subscribers = this._subscribers.set(storeName, currSubscribers.add(subscriber));
+    this._addSubsciber(storeName, subscriber);
 
-    // Return a function that will unsubscribe the subscriber
     return this._createUnsubscribFunc(storeName, subscriber)
   }
 
-  _dispatchActionFromQueue() {
-    // Dequeue next action
-    const { element: action, queue } = this._actions.dequeue();
-    this._actions = queue;
+  /* Dispatch Queue methods */
+  _addActionToQueue(action: Action): Promise<Dispatcher> {
+    // Create function that will dispatch this action, but can use future stores
+    const dispatchFunc = this._createDispatchFunction(action);
 
-    // Perform dispatch on each store
-    const newStoresPromise = dispatch(action, this._stores, this._getDefaultMiddleware());
+    // Add to dispatch queue
+    this._dispatchQueue = this._dispatchQueue.enqueue(dispatchFunc)
 
-    // Handle the updated states
-    newStoresPromise.then((newStores) => {
-      this._setStores(newStores);
+    // Return a promise that resolves when the given action finishes dispatching
+    const { tracker, promise } = this._asyncTracker.waitFor(action);
+    this._asyncTracker = tracker;
 
-      this._asyncTracker = this._asyncTracker.resolveFor(action, this);
-    }, (err) => {                                                //NOTE, not using catch so error from ^ is caught v
-      this._asyncTracker = this._asyncTracker.rejectFor(action, err);
-    }).then(() => {
+    return promise;
+  }
+
+  _dispatchFromQueue() {
+    // Dequeue next dispatch function
+    const { element: dispatchFunc, queue } = this._dispatchQueue.dequeue();
+    this._dispatchQueue = queue;
+
+    // Perform dispatch on current stores
+    dispatchFunc(this._stores).then(() => {
       // Start next dispatch if there are actions left in the queue
-      if(!this._actions.isEmpty()) this._dispatchActionFromQueue();
+      if(!this._dispatchQueue.isEmpty()) this._dispatchFromQueue();
     }).catch((err) => {
-      console.error(`Error during dispatch of ${JSON.stringify(action)}`, err);
+      if(err === DISPATCH_ERROR) return;  // DISPATCH_ERROR returned if the error has already been handled
+
+      console.error(`Internal error during dispatch`, err);
     });
   }
 
-  _setStores(stores: StoresMap) {
-    // Save stores
-    this._stores = stores;
+  _createDispatchFunction(action: Action): QueuedDispatch {
+    return (stores) => {
+      // Get middleware for dispatch
+      const middleware = this._getDefaultMiddleware();
 
-    // Call subscribers
-    this._subscribers.forEach((storeSubscribers, storeName) => {
-      if(storeSubscribers.isEmpty())  return;
+      // Perform dispatch
+      let finishedDispatchPromise = dispatch(action, stores, middleware);
 
-      const storeState = this.getStateFor(storeName);
-      storeSubscribers.forEach((storeSubscriber) => {
-        storeSubscriber(storeState);
+      // Save the updated states
+      finishedDispatchPromise = finishedDispatchPromise.then((updatedStores) => {
+        updatedStores.forEach((updatedStore, storeName) => {
+          this._setStore(storeName, updatedStore);
+        });
+
+        return updatedStores;
       });
+
+      // Resolve promises returned from '.dispatch(...)'
+      return finishedDispatchPromise.then((updatedStores) => {
+        this._asyncTracker = this._asyncTracker.resolveFor(action, this);
+
+        return updatedStores;
+      }, (err) => {                  //NOTE, not using catch so error from ^ is returned
+        this._asyncTracker = this._asyncTracker.rejectFor(action, err);
+
+        throw DISPATCH_ERROR;
+      });
+    };
+  }
+
+  _getDefaultMiddleware(): MiddlewareList {
+    return Immutable.List([
+      createGetCurrentStateMiddleware(this),
+      createPauseMiddleware(),
+      createDispatchMiddleware(this)
+    ]);
+  }
+
+  /* Stores methods */
+  _setStore<S>(storeName: string, updatedStore: Store<S>) {
+    if(!this._subscribers.has(storeName)) throw new Error(`Cannot set invalid store, ${storeName}`);
+
+    // Save new Store
+    this._stores = this._stores.set(storeName, updatedStore);
+
+    // Call each subscriber
+    const storeSubscribers = this._subscribers.get(storeName);
+    const storeState = updatedStore.getState();
+
+    storeSubscribers.forEach((storeSubscriber) => {
+      storeSubscriber(storeState)
     });
+  }
+
+  /* Subscibers methods */
+  _addSubsciber(storeName: string, subscriber: Subscriber<any>) {
+    const currSubscribers = this._subscribers.get(storeName);
+    const newSubscibers = currSubscribers.add(subscriber);
+
+    this._subscribers = this._subscribers.set(storeName, newSubscibers);
   }
 
   _createUnsubscribFunc(storeName: string, subscriber: Subscriber<any>): UnsubscibeFunc {
@@ -178,14 +228,6 @@ export default class Dispatcher {
 
       hasUnsubscribed = true;
     };
-  }
-
-  _getDefaultMiddleware(): MiddlewareList {
-    return Immutable.List([
-      createGetCurrentStateMiddleware(this),
-      createPauseMiddleware(),
-      createDispatchMiddleware(this)
-    ]);
   }
 }
 

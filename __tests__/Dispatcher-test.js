@@ -115,6 +115,7 @@ describe('Dispatcher', () => {
       });
     });
 
+    // INTERNAL ERROR
     pit('does not update(replace) any of the stores if a store has an error', () => {
       // Test Data
       const initialStates = {
@@ -132,9 +133,9 @@ describe('Dispatcher', () => {
         storeB: createStore(initialStates.storeB),
         storeC: createStore(initialStates.storeC)
       };
-      stores.storeA.dispatch.mockReturnValue(createStore(updatedStates.storeA));
-      stores.storeB.dispatch.mockReturnValue(Promise.resolve(new Error()));
-      stores.storeC.dispatch.mockReturnValue(createStore(updatedStates.storeC));
+      stores.storeA.dispatch.mockReturnValue(Promise.resolve(createStore(updatedStates.storeA)));
+      stores.storeB.dispatch.mockReturnValue(Promise.reject(new Error()));
+      stores.storeC.dispatch.mockReturnValue(Promise.resolve(createStore(updatedStates.storeC)));
 
       const dispatcher = Dispatcher.createDispatcher(stores);
 
@@ -159,7 +160,7 @@ describe('Dispatcher', () => {
       let store = createStore({});
       store.dispatch.mockReturnValue(new Promise((resolve) => {
         setTimeout(() => {
-          resolve({});
+          resolve(store);
         }, 100);
       }));
       const dispatcher = Dispatcher.createDispatcher({ store });
@@ -303,7 +304,7 @@ describe('Dispatcher', () => {
       expect(dispatcher.getStateFor('storeC')).toEqual(initialStates.storeC);
     });
 
-    it('returns the updated states for each individual stores, after a dispatch has finished', () => {
+    pit('returns the updated states for each individual stores, after a dispatch has finished', () => {
       // Test Data
       const initialStates = {
         storeA: { data: 'a', state: 'initial' },
@@ -320,9 +321,9 @@ describe('Dispatcher', () => {
         storeB: createStore(initialStates.storeB),
         storeC: createStore(initialStates.storeC)
       };
-      stores.storeA.dispatch.mockReturnValue(createStore(updatedStates.storeA));
-      stores.storeB.dispatch.mockReturnValue(createStore(updatedStates.storeB));
-      stores.storeC.dispatch.mockReturnValue(createStore(updatedStates.storeC));
+      stores.storeA.dispatch.mockReturnValue(Promise.resolve(createStore(updatedStates.storeA)));
+      stores.storeB.dispatch.mockReturnValue(Promise.resolve(createStore(updatedStates.storeB)));
+      stores.storeC.dispatch.mockReturnValue(Promise.resolve(createStore(updatedStates.storeC)));
 
       const dispatcher = Dispatcher.createDispatcher(stores);
 
@@ -347,10 +348,10 @@ describe('Dispatcher', () => {
         storeC: { data: 'c', state: 'wrong' }
       };
       let storeB = createStore(initialStates.storeB);
-      storeB.dispatch = jest.fn(() => {
+      storeB.dispatch.mockImplementation(() => {
         return new Promise((resolve) => {
           setTimeout(() => {
-            resolve(updatedStates.storeB)
+            resolve(createStore(updatedStates.storeB));
           }, 200);
         });
       });
@@ -359,8 +360,8 @@ describe('Dispatcher', () => {
         storeB,
         storeC: createStore(initialStates.storeC)
       };
-      stores.storeA.dispatch.mockReturnValue(createStore(updatedStates.storeA));
-      stores.storeC.dispatch.mockReturnValue(createStore(updatedStates.storeC));
+      stores.storeA.dispatch.mockReturnValue(Promise.resolve(createStore(updatedStates.storeA)));
+      stores.storeC.dispatch.mockReturnValue(Promise.resolve(createStore(updatedStates.storeC)));
       const dispatcher = Dispatcher.createDispatcher(stores);
 
       // Perform Test
@@ -482,9 +483,9 @@ describe('Dispatcher', () => {
         storeB: createStore(initialStates.storeB),
         storeC: createStore(initialStates.storeC)
       };
-      stores.storeA.dispatch.mockReturnValue(createStore(updatedStates.storeA));
-      stores.storeB.dispatch.mockReturnValue(createStore(updatedStates.storeB));
-      stores.storeC.dispatch.mockReturnValue(createStore(updatedStates.storeC));
+      stores.storeA.dispatch.mockReturnValue(Promise.resolve(createStore(updatedStates.storeA)));
+      stores.storeB.dispatch.mockReturnValue(Promise.resolve(createStore(updatedStates.storeB)));
+      stores.storeC.dispatch.mockReturnValue(Promise.resolve(createStore(updatedStates.storeC)));
 
       let dispatcher = Dispatcher.createDispatcher(stores);
       subscribers.storeA.forEach((subscriber) => {
