@@ -4,6 +4,13 @@
 import type { Middleware } from 'async-dispatcher';
 import type Dispatcher from './Dispatcher';
 
+/**
+ * Create a middleware that adds 'getStoreName()' to plugins.
+ *
+ * @param storeName {string}      The name to return from the plugin function
+ *
+ * @return          {Middleware}  The middleware that adds the plugin function
+ */
 export function createGetStoreNameMiddleware(storeName: string): Middleware {
   return (state, action, plugins, next) => {
     //Add plugin
@@ -13,6 +20,13 @@ export function createGetStoreNameMiddleware(storeName: string): Middleware {
   };
 }
 
+/**
+ * Create a middleware that adds 'getCurrentState()' to plugins.
+ *
+ * @param dispatcher  {Dispatcher} The dispatcher to get the state from
+ *
+ * @return            {Middleware}  The middleware that adds the plugin function
+ */
 export function createGetCurrentStateMiddleware(dispatcher: Dispatcher): Middleware {
   return (state, action, plugins, next) => {
     if(typeof plugins.getStoreName !== 'function') throw new Error('getCurrentState requires getStoreName plugin');
@@ -25,6 +39,11 @@ export function createGetCurrentStateMiddleware(dispatcher: Dispatcher): Middlew
   };
 }
 
+/**
+ * Create a middleware that adds 'pause()' to plugins.
+ *
+ * @return          {Middleware}  The middleware that adds the plugin function
+ */
 export function createPauseMiddleware(): Middleware {
   return (state, action, plugins, next) => {
     //Add plugin
@@ -34,6 +53,13 @@ export function createPauseMiddleware(): Middleware {
   };
 }
 
+/**
+ * Create a middleware that adds 'dispatch()' to plugins.
+ *
+ * @param dispatcher  {Dispatcher} The dispatcher to get the state from
+ *
+ * @return            {Middleware}  The middleware that adds the plugin function
+ */
 export function createDispatchMiddleware(dispatcher: Dispatcher): Middleware {
   return (state, action, plugins, next) => {
     if(typeof plugins.getCurrentState !== 'function') throw new Error('dispatch requires getCurrentState middleware');
