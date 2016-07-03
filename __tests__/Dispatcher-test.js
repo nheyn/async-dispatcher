@@ -11,10 +11,10 @@ import {
 import Dispatcher from '../src/Dispatcher';
 
 // Set up mocks
-function createStore(initialState) {
+function createStore(initialState, isMutable) {
   const store = new Store(initialState);
 
-  store.dispatch.mockReturnValue(Promise.resolve(store));   // NOTE: not immutable, to make testing easier
+  store.dispatch.mockImplementation(() => Promise.resolve(!isMutable? store: createStore(initialState, isMutable)));
   store.getState.mockReturnValue(initialState);
 
   return store;
@@ -410,7 +410,7 @@ describe('Dispatcher', () => {
   });
 
   describe('subscribeTo(...)', () => {
-    it('call the given functions every time the given store is updated', () => {
+    pit('call the given functions every time the given store is updated', () => {
       // Test Data
       const dispatchCount = 3;
       const subscribers = {
@@ -418,10 +418,15 @@ describe('Dispatcher', () => {
         storeB: [ jest.fn(), jest.fn(), jest.fn() ],
         storeC: [ jest.fn(), jest.fn(), jest.fn() ]
       };
-      const dispatcher = Dispatcher.createDispatcher({
+      let storeC = createStore({});
+      storeC.dispatch
+        .mockReturnValueOnce(storeC)
+        .mockReturnValueOnce(storeC)
+        .mockReturnValueOnce(Promise.resolve(createStore({})));
+      let dispatcher = Dispatcher.createDispatcher({
         storeA: createStore({}),
-        storeB: createStore({}),
-        storeC: createStore({})
+        storeB: createStore({}, true),
+        storeC
       });
       subscribers.storeA.forEach((subscriber) => {
         dispatcher.subscribeTo('storeA', subscriber);
@@ -446,7 +451,7 @@ describe('Dispatcher', () => {
         subscribers.storeA.forEach((subscriber) => {
           const { calls } = subscriber.mock;
 
-          expect(calls.length).toBe(dispatchCount);
+          expect(calls.length).toBe(0);
         });
         subscribers.storeB.forEach((subscriber) => {
           const { calls } = subscriber.mock;
@@ -456,7 +461,7 @@ describe('Dispatcher', () => {
         subscribers.storeC.forEach((subscriber) => {
           const { calls } = subscriber.mock;
 
-          expect(calls.length).toBe(dispatchCount);
+          expect(calls.length).toBe(1);
         });
       });
     });

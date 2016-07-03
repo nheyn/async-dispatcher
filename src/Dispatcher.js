@@ -194,6 +194,10 @@ export default class Dispatcher {
   /* Stores methods */
   _setStore<S>(storeName: string, updatedStore: Store<S>) {
     if(!this._subscribers.has(storeName)) throw new Error(`Cannot set invalid store, ${storeName}`);
+    if(!this._stores.has(storeName))      throw new Error(`Cannot set invalid store, ${storeName}`);
+
+    // Don't do anything if the store hasn't changed
+    if(this._stores.get(storeName) === updatedStore) return;
 
     // Save new Store
     this._stores = this._stores.set(storeName, updatedStore);
