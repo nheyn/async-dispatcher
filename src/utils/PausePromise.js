@@ -31,14 +31,10 @@ export default class PausePromise {
     return maybePausePromise && maybePausePromise.isPausePromise? true: false;
   }
 
-  getPromise(): Promise<any> {
-    return this._promise;
-  }
-
-  resolveFor(maybePromise: any | Promise<any>): Promise<any> {
+  waitFor(): Promise<any> {
     return this._promiseFuncs.reduce((currPromise, { thenFunc, catchFunc }) => {
       return currPromise.then(thenFunc, catchFunc);
-    }, Promise.resolve(maybePromise));
+    }, this._promise);
   }
 
   then(thenFunc: (value: any) => any, catchFunc?: (err: Error) => any): PausePromise {
