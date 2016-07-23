@@ -3,7 +3,7 @@
  */
 import PausePromise from './utils/PausePromise';
 
-import type { Middleware } from 'async-dispatcher';
+import type { Action, Middleware } from 'async-dispatcher';
 import type Dispatcher from './Dispatcher';
 
 /**
@@ -46,7 +46,7 @@ export function createGetCurrentStateMiddleware(dispatcher: Dispatcher): Middlew
  *
  * @return          {Middleware}  The middleware that adds the plugin function
  */
-export function createPauseMiddleware(
+export function createPauseMiddleware<S>(
   restartDispatch: (state: S, action: Action, startAt: number) => void,
   rejectDispatch: (err: Error, action: Action) => void,
   pauseErr: Error
@@ -78,27 +78,55 @@ export function createPauseMiddleware(
   };
 }
 
+type DispatchWithState<S> = (storeName: string, state: S, action: Action) => void;
+
 /**
  * Create a middleware that adds 'dispatch()' to plugins.
  *
- * @param dispatcher  {Dispatcher} The dispatcher to get the state from
- *
  * @return            {Middleware}  The middleware that adds the plugin function
  */
-export function createDispatchMiddleware(dispatcher: Dispatcher): Middleware {
+export function createDispatchMiddleware<S>(dispatchWithState: DispatchWithState): Middleware {
   return (state, action, plugins, next) => {
     if(typeof plugins.getCurrentState !== 'function') throw new Error('dispatch requires getCurrentState middleware');
     if(typeof plugins.pause !== 'function')           throw new Error('dispatch requires pause middleware');
+    if(typeof plugins.getStoreName !== 'function') throw new Error('getCurrentState requires getStoreName plugin');
 
     //Add plugin
-    plugins.dispatch = (action) => {
-      const dispatchPromise = dispatcher.dispatch(action);
-      const newStatePromise = dispatchPromise.then(() => plugins.getCurrentState());
+    plugins.dispatch = (updatedStateMaybePromise, action) => {
+      const dispatchPromise = Promise.resolve(updatedStateMaybePromise).then((updatedState) => {
+        const storeName = plugins.getStoreName();
+
+        return dispatchWithState(storeName, updatedState, action)
+      });
 
       // Pause this dispatch until the action has been dispatched
-      return plugins.pause(newStatePromise);
+      return plugins.pause(dispatchPromise).then(() => plugins.getCurrentState());
     };
 
     return next(state, action, plugins);
+  };
+}
+
+export function createSkipUpdaterMiddleware(startAt: number): Middleware {
+  return (state, action, plugins, next) => {
+    if(typeof plugins.getUpdaterIndex !== 'function') throw new Error('pause requires getUpdaterIndex plugin');
+    const pausedIndex = plugins.getUpdaterIndex();
+
+    if(pausedIndex >= startAt)  return next(state, action, plugins);
+    else                        return Promise.resolve(state);
+  };
+}
+
+export function createReplaceStateMiddleware<S>(storeName: string, updatedState: S): Middleware {
+  return (state, action, plugins, next) => {
+    if(typeof plugins.getCurrentState !== 'function') throw new Error('dispatch requires getCurrentState middleware');
+    if(typeof plugins.getUpdaterIndex !== 'function') throw new Error('pause requires getUpdaterIndex plugin');
+
+    const currStoreName = plugins.getCurrentState();
+    const currUpdaterIndex = plugins.getUpdaterIndex();
+
+    if(currUpdaterIndex === 0 && storeName === currStoreName) return next(updatedState, action, plugins);
+    else                                                      return next(state, action, plugins);
+
   };
 }

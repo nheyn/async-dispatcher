@@ -7,7 +7,9 @@ import {
   createGetStoreNameMiddleware,
   createGetCurrentStateMiddleware,
   createPauseMiddleware,
-  createDispatchMiddleware
+  createDispatchMiddleware,
+  createSkipUpdaterMiddleware,
+  createReplaceStateMiddleware
 } from './middleware';
 import Queue from './utils/Queue';
 import AsyncTracker from './utils/AsyncTracker';
@@ -21,6 +23,7 @@ type SubscriberMap = Immutable.Map<string, Immutable.Set<Subscriber>>;
 type MiddlewareList = Immutable.List<Middleware<any>>;
 type QueuedDispatch = (stores: StoresMap) => Promise<StoresMap>;
 
+const PAUSE_ERROR = new Error('[Pause Error] DO NOT HANDLE THIS ERROR, re-throw if caught');
 const DISPATCH_ERROR = new Error('Error thrown during dispatch');
 
 /**
@@ -128,7 +131,7 @@ export default class Dispatcher {
     const dispatchFunc = this._createDispatchFunction(action);
 
     // Add to dispatch queue
-    this._dispatchQueue = this._dispatchQueue.enqueue(dispatchFunc)
+    this._dispatchQueue = this._dispatchQueue.enqueue(dispatchFunc);
 
     // Return a promise that resolves when the given action finishes dispatching
     const { tracker, promise } = this._asyncTracker.waitFor(action);
@@ -143,20 +146,24 @@ export default class Dispatcher {
     this._dispatchQueue = queue;
 
     // Perform dispatch on current stores
-    dispatchFunc(this._stores).then(() => {
-      // Start next dispatch if there are actions left in the queue
-      if(!this._dispatchQueue.isEmpty()) this._dispatchFromQueue();
-    }).catch((err) => {
-      if(err === DISPATCH_ERROR) return;  // DISPATCH_ERROR returned if the error has already been handled
+    const finishedDispatchPromise = dispatchFunc(this._stores)
+
+    // Start next dispatch if there are actions left in the queue
+    finishedDispatchPromise.catch((err) => {
+      if(err === DISPATCH_ERROR) return;  // DISPATCH_ERROR thrown if the error has already been handled
+      if(err === PAUSE_ERROR) return;     // PAUSE_ERROR    thrown during pauses
 
       console.error(`Internal error during dispatch`, err);
+    }).then(() => {
+      if(!this._dispatchQueue.isEmpty()) this._dispatchFromQueue();
     });
   }
 
-  _createDispatchFunction(action: Action): QueuedDispatch {
+  _createDispatchFunction(action: Action, currMiddleware?: MiddlewareList): QueuedDispatch {
     return (stores) => {
       // Get middleware for dispatch
-      const middleware = this._getDefaultMiddleware();
+      const defaultMiddleware = this._getDefaultMiddleware();
+      const middleware = currMiddleware? currMiddleware.concat(defaultMiddleware): defaultMiddleware;
 
       // Perform dispatch
       let finishedDispatchPromise = dispatch(action, stores, middleware);
@@ -176,6 +183,9 @@ export default class Dispatcher {
 
         return updatedStores;
       }, (err) => {                  //NOTE, not using catch so error from ^ is returned
+        // Don't resolve if dispatch has been paused
+        if(err === PAUSE_ERROR) throw err;
+
         this._asyncTracker = this._asyncTracker.rejectFor(action, err);
 
         throw DISPATCH_ERROR;
@@ -186,8 +196,26 @@ export default class Dispatcher {
   _getDefaultMiddleware(): MiddlewareList {
     return Immutable.List([
       createGetCurrentStateMiddleware(this),
-      createPauseMiddleware(),
-      createDispatchMiddleware(this)
+      createPauseMiddleware(
+        (state, action, index) => {
+          const dispatchFunc = this._createDispatchFunction(action, Immutable.List([
+            createSkipUpdaterMiddleware(index)
+          ]));
+
+          this._dispatchQueue = this._dispatchQueue.enqueue(dispatchFunc);
+        },
+        (err, action) => {
+          this._asyncTracker = this._asyncTracker.rejectFor(action, err);
+        },
+        PAUSE_ERROR
+      ),
+      createDispatchMiddleware((storeName, updatedState, action) => {
+        const dispatchFunc = this._createDispatchFunction(action, Immutable.List([
+          createReplaceStateMiddleware(storeName, updatedState)
+        ]));
+
+        this._dispatchQueue = this._dispatchQueue.enqueue(dispatchFunc);
+      })
     ]);
   }
 
