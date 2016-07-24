@@ -2,14 +2,14 @@
  * @flow
  */
 import Immutable from 'immutable';
+import uuid from 'node-uuid';
 
 import {
   createGetStoreNameMiddleware,
   createGetCurrentStateMiddleware,
   createPauseMiddleware,
   createDispatchMiddleware,
-  createSkipUpdaterMiddleware,
-  createReplaceStateMiddleware
+  createSkipUpdaterMiddleware
 } from './middleware';
 import Queue from './utils/Queue';
 import AsyncTracker from './utils/AsyncTracker';
@@ -33,7 +33,7 @@ export default class Dispatcher {
   _stores: StoresMap;
   _subscribers: SubscriberMap;
   _dispatchQueue: Queue<QueuedDispatch>;
-  _asyncTracker: AsyncTracker<Action, Dispatcher>;    //NOTE, assume every action is a diffrent object (no global const)
+  _asyncTracker: AsyncTracker<string, Dispatcher>;
 
   /**
    * Constructor for the Dispatcher.
@@ -127,17 +127,21 @@ export default class Dispatcher {
 
   /* Dispatch Queue methods */
   _addActionToQueue(action: Action): Promise<Dispatcher> {
-    // Create function that will dispatch this action, but can use future stores
-    const dispatchFunc = this._createDispatchFunction(action);
+    const dispatchId = uuid.v4();
 
-    // Add to dispatch queue
+    const dispatchFunc = this._createNewDispatchFunction(dispatchId, action);
     this._dispatchQueue = this._dispatchQueue.enqueue(dispatchFunc);
 
-    // Return a promise that resolves when the given action finishes dispatching
-    const { tracker, promise } = this._asyncTracker.waitFor(action);
-    this._asyncTracker = tracker;
+    return this._createTrackerPromise(dispatchId);
+  }
 
-    return promise;
+  _requeueDispatch(dispatchId: string, action: Action, storeName: string, startAt: number) {
+    const middleware = Immutable.List([
+      createSkipUpdaterMiddleware(storeName, startAt)
+    ]);
+
+    const dispatchFunc = this._createDispatchFunction(dispatchId, action, middleware);
+    this._dispatchQueue = this._dispatchQueue.enqueue(dispatchFunc);
   }
 
   _dispatchFromQueue() {
@@ -159,84 +163,89 @@ export default class Dispatcher {
     });
   }
 
-  _createDispatchFunction(action: Action, currMiddleware?: MiddlewareList): QueuedDispatch {
+  _createNewDispatchFunction(dispatchId: string, action: Action): QueuedDispatch {
     return (stores) => {
-      // Get middleware for dispatch
-      const defaultMiddleware = this._getDefaultMiddleware();
-      const middleware = currMiddleware? currMiddleware.concat(defaultMiddleware): defaultMiddleware;
+      // Create dispatch function with dispatchId
+      const dispatchFunc = this._createDispatchFunction(dispatchId, action);
 
-      // Perform dispatch
-      let finishedDispatchPromise = dispatch(action, stores, middleware);
-
-      // Save the updated states
-      finishedDispatchPromise = finishedDispatchPromise.then((updatedStores) => {
-        updatedStores.forEach((updatedStore, storeName) => {
-          this._setStore(storeName, updatedStore);
-        });
+      // Resolve/Reject promise returned from '.dispatch(...)' method
+      return dispatchFunc(stores).then((updatedStores) => {
+        this._resolveTrackerFor(dispatchId, this);
 
         return updatedStores;
-      });
-
-      // Resolve promises returned from '.dispatch(...)'
-      return finishedDispatchPromise.then((updatedStores) => {
-        this._asyncTracker = this._asyncTracker.resolveFor(action, this);
-
-        return updatedStores;
-      }, (err) => {                  //NOTE, not using catch so error from ^ is returned
+      }, (err) => {           //NOTE, not using catch so errors from ^ are returned
         // Don't resolve if dispatch has been paused
         if(err === PAUSE_ERROR) throw err;
 
-        this._asyncTracker = this._asyncTracker.rejectFor(action, err);
+        this._rejectTrackerFor(dispatchId, err);
 
         throw DISPATCH_ERROR;
       });
     };
   }
 
-  _getDefaultMiddleware(): MiddlewareList {
+  _createDispatchFunction(dispatchId: string, action: Action, currMiddleware?: MiddlewareList): QueuedDispatch {
+    return (stores) => {
+      // Get middleware for dispatch
+      const defaultMiddleware = this._getDefaultMiddleware(dispatchId, action);
+      const middleware = currMiddleware?
+                          currMiddleware.concat(defaultMiddleware):
+                          defaultMiddleware;
+
+      // Perform dispatch
+      const finishedDispatchPromise = dispatch(action, stores, middleware);
+
+      // Save the updated states
+      return finishedDispatchPromise.then((updatedStores) => {
+        updatedStores.forEach((updatedStore, storeName) => {
+          this._setStore(storeName, updatedStore);
+        });
+
+        return updatedStores;
+      });
+    };
+  }
+
+  _getDefaultMiddleware(dispatchId: string, action: Action): MiddlewareList {
     return Immutable.List([
       createGetCurrentStateMiddleware(this),
-      createPauseMiddleware(
-        (state, action, index) => {
-          const dispatchFunc = this._createDispatchFunction(action, Immutable.List([
-            createSkipUpdaterMiddleware(index)
-          ]));
+      createPauseMiddleware({
+        restartDispatch(storeName, state, index) {
+          this._setStoreState(storeName, state);
 
-          this._dispatchQueue = this._dispatchQueue.enqueue(dispatchFunc);
+          this._requeueDispatch(dispatchId, action, storeName, index);
         },
-        (err, action) => {
-          this._asyncTracker = this._asyncTracker.rejectFor(action, err);
+        rejectDispatch(err) {
+          this._rejectTrackerFor(dispatchId, err);
         },
-        PAUSE_ERROR
-      ),
-      createDispatchMiddleware((storeName, updatedState, action) => {
-        const dispatchFunc = this._createDispatchFunction(action, Immutable.List([
-          createReplaceStateMiddleware(storeName, updatedState)
-        ]));
+        pauseError: PAUSE_ERROR
+      }),
+      createDispatchMiddleware((storeName, state, nextAction) => {
+          this._setStoreState(storeName, state);
 
-        this._dispatchQueue = this._dispatchQueue.enqueue(dispatchFunc);
+          return this.dispatch(nextAction);
       })
     ]);
   }
 
   /* Stores methods */
   _setStore<S>(storeName: string, updatedStore: Store<S>) {
-    if(!this._subscribers.has(storeName)) throw new Error(`Cannot set invalid store, ${storeName}`);
-    if(!this._stores.has(storeName))      throw new Error(`Cannot set invalid store, ${storeName}`);
+    if(!this._stores.has(storeName))  throw new Error(`Cannot set invalid store, ${storeName}`);
 
     // Don't do anything if the store hasn't changed
     if(this._stores.get(storeName) === updatedStore) return;
 
-    // Save new Store
     this._stores = this._stores.set(storeName, updatedStore);
+    this._callSubscribers(storeName);
+  }
 
-    // Call each subscriber
-    const storeSubscribers = this._subscribers.get(storeName);
-    const storeState = updatedStore.getState();
+  _setStoreState<S>(storeName: string, updatedState: S) {
+    if(!this._stores.has(storeName))  throw new Error(`Cannot set state of invalid store, ${storeName}`);
 
-    storeSubscribers.forEach((storeSubscriber) => {
-      storeSubscriber(storeState)
-    });
+    const currStore = this._stores.get(storeName);
+    const updatedStore = currStore.replaceState(updatedState);
+
+    this._setStore(storeName, updatedStore);
   }
 
   /* Subscibers methods */
@@ -254,12 +263,39 @@ export default class Dispatcher {
         throw new Error('Cannot unsubscribe: subscriber has already been removed from the dispatcher');
       }
 
-      // Perform unsubscribe
       const currSubscribers = this._subscribers.get(storeName);
       this._subscribers = this._subscribers.set(storeName, currSubscribers.delete(subscriber));
 
       hasUnsubscribed = true;
     };
+  }
+
+  _callSubscribers(storeName: string) {
+    if(!this._subscribers.has(storeName)) throw new Error(`Cannot call subscribers for invalid store, ${storeName}`);
+    if(!this._stores.has(storeName))      throw new Error(`Cannot call subscribers for invalid store, ${storeName}`);
+
+    const storeSubscribers = this._subscribers.get(storeName);
+    const storeState = this._stores.get(storeName).getState();
+
+    storeSubscribers.forEach((storeSubscriber) => {
+      storeSubscriber(storeState)
+    });
+  }
+
+  /* Async Tracker methods */
+  _createTrackerPromise(dispatchId: string): Promise<Dispatcher> {
+    const { tracker, promise } = this._asyncTracker.waitFor(dispatchId);
+    this._asyncTracker = tracker;
+
+    return promise;
+  }
+
+  _resolveTrackerFor(dispatchId: string) {
+    this._asyncTracker = this._asyncTracker.resolveFor(dispatchId, this);
+  }
+
+  _rejectTrackerFor(dispatchId: string, err: Error) {
+    this._asyncTracker = this._asyncTracker.rejectFor(dispatchId, err);
   }
 }
 

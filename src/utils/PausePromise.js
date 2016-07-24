@@ -10,6 +10,8 @@ type PromiseFunc<I, F> = {
 
 /**
  * Place holder for promises used after a pause is called.
+ *
+ * ERROR: then of middleware not called (might be caused by this, or middleware order???)
  */
 export default class PausePromise {
   isPausePromise: bool;

@@ -1,11 +1,12 @@
 {
   "name": "async-dispatcher",
   "version": "0.0.1-dev",
-  "description": "A redux style dispatcher that natively supports async updates.",
+  "description": "A redux style dispatcher that has built in support for async updates.",
   "author": "Nick Heyn <nick@heyn.io>",
   "main": "./lib/index.js",
   "dependencies": {
-    "immutable": "^3.7.6"
+    "immutable": "^3.7.6",
+    "node-uuid": "^1.4.7"
   },
   "devDependencies": {
     "babel-cli": "^6.9.0",
@@ -35,6 +36,7 @@
   "jest": {
     "unmockedModulePathPatterns": [
       "immutable",
+      "node-uuid",
       ".*/utils/.*"
     ]
   },

@@ -28,3 +28,8 @@ declare module 'async-dispatcher' {
   }
   declare function createDispatcher(initialStores: {[key: string]: Store<any>}): Dispatcher;
 }
+
+declare module 'node-uuid' {
+  declare function v1(): string;
+  declare function v4(): string;
+}

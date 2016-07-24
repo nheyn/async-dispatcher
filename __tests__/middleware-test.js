@@ -108,10 +108,15 @@ describe('middleware', () => {
       // Test Data
       const passedInState = { data: 'state' };
       const passedInAction = { type: 'TEST_ACTION' };
-      const middleware = createPauseMiddleware();
+      const middleware = createPauseMiddleware({
+        restartDispatch: jest.fn(),
+        rejectDispatch: jest.fn(),
+        pauseError: new Error()
+      });
+      const plugins = { getUpdaterIndex: jest.fn(), getStoreName: jest.fn() };
 
       // Perform Test
-      middleware(passedInState, passedInAction, { getUpdaterIndex: jest.fn() }, (state, action) => {
+      middleware(passedInState, passedInAction, plugins, (state, action) => {
         expect(state).toBe(passedInState);
         expect(action).toBe(passedInAction);
       });
@@ -121,10 +126,15 @@ describe('middleware', () => {
       // Test Data
       const finalState = { data: 'state' };
       const next = () => Promise.resolve(finalState);
-      const middleware = createPauseMiddleware();
+      const middleware = createPauseMiddleware({
+        restartDispatch: jest.fn(),
+        rejectDispatch: jest.fn(),
+        pauseError: new Error()
+      });
+      const plugins = { getUpdaterIndex: jest.fn(), getStoreName: jest.fn() };
 
       // Perform Test
-      return middleware({}, {}, { getUpdaterIndex: jest.fn() }, next).then((state) => {
+      return middleware({}, {}, plugins, next).then((state) => {
         expect(state).toBe(finalState);
       });
     });

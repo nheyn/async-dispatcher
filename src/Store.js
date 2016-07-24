@@ -76,11 +76,22 @@ export default class Store<S> {
       // Check for valid state
       if(typeof updatedState === 'undefined') throw new Error('a state must be returned from each updater');
 
-      // Return 'this' if the state has not changed, else create Store with the updated state
-      return this._state !== updatedState?
-              new Store(updatedState, this._updaters, this._middleware):
-              this;
+      return this.replaceState(updatedState);
     });
+  }
+
+  /**
+   * Replace the state of the Store.
+   *
+   * @param newState  {amy}   The state to use
+   *
+   * @return          {Store} The Store with the replaced state
+   */
+  replaceState(newState: S): Store<S> {
+    // Return 'this' if the state has not changed
+    if(this._state === newState) return this;
+
+    return new Store(newState, this._updaters, this._middleware);
   }
 
   /**
@@ -104,18 +115,20 @@ export default class Store<S> {
  * @return            {Promise<any>}      The updated state in a Promise
  */
 function dispatch<S>(state: S, action: Action, updaters: UpdaterList<S>, middleware: MiddlewareList<S>): Promise<S> {
-  const createUpdater = (updater, index) => {
-    // Built in plugins
-    const initPlugins = { getUpdaterIndex: () => index };
-
-    // Apply middleware to updater
-    return combineMiddleware(middleware, updater, initPlugins);
-  };
-
   // Go through each updater
   return asyncReduce(updaters, (currState, updater, index) => {
+    // Built in plugins
+    const initPlugins = {
+      getUpdaterIndex() {
+        return index;
+      },
+      getUpdaterCount() {
+        return updaters.size;
+      },
+    };
+
     // Call updater with middleware/plugins for this dispatch/updater (not sure why type is neeed ???)
-    const currUpdater: CombinedUpdater<S> = createUpdater(updater, index);
+    const currUpdater: CombinedUpdater<S> = combineMiddleware(middleware, updater, initPlugins);
 
     return currUpdater(currState, action);
   }, state);

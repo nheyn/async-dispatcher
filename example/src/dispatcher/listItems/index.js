@@ -6,6 +6,7 @@ import { createStore } from 'async-dispatcher';
 import createLogMiddleware from '../createLogMiddleware';
 import addItem from './addItem';
 import checkItem from './checkItem';
+import updateItem from './updateItem';
 
 export type ListItemState = {
   id: number,
@@ -13,7 +14,7 @@ export type ListItemState = {
   isChecked: bool
 };
 
-const logMiddleware = createLogMiddleware('listItems dispatch:');
+const logMiddleware = createLogMiddleware('listItems');
 
 export default createStore({
   initialState: [
@@ -23,9 +24,10 @@ export default createStore({
   ],
   updaters: [
     addItem,
-    checkItem
+    checkItem,
+    updateItem,
   ],
   middleware: [
-    logMiddleware
-  ]
-})
+    logMiddleware,
+  ],
+});

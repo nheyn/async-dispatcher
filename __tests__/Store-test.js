@@ -246,6 +246,35 @@ describe('Store', () => {
       });
     });
 
+    pit('will call the middleware in the correct order, with dispatch middleware before the Store\'s', () => {
+      // Test Data
+      const updaters = [
+        createUpdater(),
+        createUpdater(),
+        createUpdater()
+      ];
+      const storeMiddleware = [
+        createMiddleware(),
+        createMiddleware(),
+        createMiddleware()
+      ];
+      const dispatchMiddleware = [
+        createMiddleware(),
+        createMiddleware(),
+        createMiddleware()
+      ];
+      const store = Store.createStore({
+        initialState: {},
+        updaters,
+        middleware: storeMiddleware
+      });
+
+       // Perform Tests
+      return store.dispatch({ }, Immutable.List(dispatchMiddleware)).then(() => {
+        //TODO, how to test
+      });
+    });
+
     pit('will call the middleware with stores state', () => {
       // Test Data
       const initialState = { data: 'test state' };
