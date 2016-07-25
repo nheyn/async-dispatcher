@@ -4,6 +4,8 @@
 import Immutable from 'immutable';
 import uuid from 'node-uuid';
 
+
+import Store from './Store';
 import {
   createGetStoreNameMiddleware,
   createGetCurrentStateMiddleware,
@@ -15,8 +17,7 @@ import Queue from './utils/Queue';
 import AsyncTracker from './utils/AsyncTracker';
 import mapOfPromisesToMapPromise from './utils/mapOfPromisesToMapPromise';
 
-import type { Action, Middleware, Subscriber, UnsubscibeFunc } from 'async-dispatcher';
-import type Store from './Store';
+import type { Action, Middleware, Subscriber, Updater, UnsubscibeFunc } from 'async-dispatcher';
 
 type StoresMap = Immutable.Map<string, Store<any>>;
 type SubscriberMap = Immutable.Map<string, Immutable.Set<Subscriber>>;
@@ -64,8 +65,13 @@ export default class Dispatcher {
    *
    * @return              {Dispatcher}    The dispatcher using the given stores
    */
-  static createDispatcher(initialStores: {[key: string]: Store<any>}): Dispatcher {
-    const initialStoreMap = Immutable.Map(initialStores);
+  static createDispatcher(initialStores: {[key: string]: Store<any> | Updater<any> | Object }): Dispatcher {
+    const initialStoreMap = Immutable.Map(initialStores).map((initialStore, storeName) => {
+      if(!initialStore)                             throw new Error('Store cannot be null/undefined');
+      else if(typeof initialStore === 'function')   return Store.createReduxStore(initialStore);
+      else if(Store.isStore(initialStore))          return initialStore;
+      else                                          return Store.createStaticStore(initialStore);
+    });
 
     return new Dispatcher(
       initialStoreMap,

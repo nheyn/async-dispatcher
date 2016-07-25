@@ -53,6 +53,40 @@ export default class Store<S> {
   }
 
   /**
+   *
+   */
+  static isStore(maybeStore: any): bool {
+    if(typeof maybeStore.dispatch !== 'function')     return false;
+    if(typeof maybeStore.replaceState !== 'function') return false;
+    if(typeof maybeStore.getState !== 'function')     return false;
+
+    return true;
+  }
+
+  /**
+   *
+   */
+  static createStaticStore(state: S): Store<S> {
+    return Store.createStore({
+      initialState: state,
+      updaters: [],
+    });
+  }
+
+  /**
+   *
+   */
+  static createReduxStore(reducer: Updater<S>): Store<S> {
+    // $FlowSkip - The 1st arg is undefined to get redux style initial state
+    const initialState = reducer(undefined, { type: '@@async-dispatcher/INIT' });
+
+    return Store.createStore({
+      initialState,
+      updaters: [ reducer ],
+    });
+  }
+
+  /**
    * Update the Store by calling the actions in all the updaters.
    *
    * @param action      {Object}            The action to pass to each of the updaters

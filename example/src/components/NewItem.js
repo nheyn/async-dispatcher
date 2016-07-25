@@ -3,42 +3,28 @@
  */
 import React from 'react';
 
-type State = {
-  label: string
-};
-
 type Props = {
-  onAddItem: (label: string) => void
+  label: string,
+  onUpdateNewItem: (label: string) => void,
+  onAddItem: () => void,
 };
 
 export default class NewItem extends React.Component {
-  state: State;
   props: Props;
 
-  constructor(props: Props, context: any) {
-    super(props, context);
-
-    this.state = {
-      label: ''
-    };
-  }
-
   onAddClicked() {
-    const { label } = this.state;
-    const { onAddItem } = this.props;
+    const { label, onAddItem } = this.props;
 
     onAddItem(label);
-
-    this.setState({ label: '' });
   }
 
   render(): React.Element {
-    const { label } = this.state;
+    const { label, onUpdateNewItem, onAddItem } = this.props;
 
     return (
       <div>
-        <input type="text" value={label} onChange={({ target }) => this.setState({ label: target.value })} />
-        <button onClick={() => this.onAddClicked()}>Add</button>
+        <input type="text" value={label} onChange={({ target }) => onUpdateNewItem(target.value)} />
+        <button onClick={() => onAddItem()}>Add</button>
       </div>
     );
   }

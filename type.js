@@ -26,7 +26,7 @@ declare module 'async-dispatcher' {
     getStateFor(storeName: string): any;
     subscribeTo(storeName: string, subscriber: Subscriber<any>): UnsubscibeFunc;
   }
-  declare function createDispatcher(initialStores: {[key: string]: Store<any>}): Dispatcher;
+  declare function createDispatcher(initialStores: {[key: string]: Store<any> | Updater<any> | Object }): Dispatcher;
 }
 
 declare module 'node-uuid' {

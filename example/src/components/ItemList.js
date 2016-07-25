@@ -14,12 +14,16 @@ type Props = {
     label: string,
     isChecked: bool
   }>,
+  newItem: string,
   onCheck: (id: number) => void,
   onUncheck: (id: number) => void,
-  onAddItem: (label: string) => void,
+  onUpdateNewItem: (label: string) => void,
+  onAddItem: () => void,
 };
 
-export default function ItemList({ items, onCheck, onUncheck, onAddItem }: Props): React.Element {
+export default function ItemList(
+  { items, newItem, onCheck, onUncheck, onUpdateNewItem, onAddItem }: Props
+): React.Element {
   return (
     <ul>
     {items.map(({ id, label, isChecked }) =>
@@ -28,7 +32,7 @@ export default function ItemList({ items, onCheck, onUncheck, onAddItem }: Props
       </li>
     )}
       <li>
-        <NewItem onAddItem={onAddItem} />
+        <NewItem label={newItem} onAddItem={onAddItem} onUpdateNewItem={onUpdateNewItem} />
       </li>
     </ul>
   );

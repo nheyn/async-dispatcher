@@ -19,6 +19,7 @@ function createStore(initialState, isMutable) {
 
   return store;
 }
+Store.isStore.mockReturnValue(true);
 
 const getStoreName = jest.fn().mockImplementation((s, a, p, next) => next(s, a, p));
 const getCurrentState = jest.fn().mockImplementation((s, a, p, next) => next(s, a, p));

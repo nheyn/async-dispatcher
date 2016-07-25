@@ -4,12 +4,12 @@
 import Dispatcher from './Dispatcher';
 import Store from './Store';
 
-import type { StoreSpec } from 'async-dispatcher';
+import type { StoreSpec, Updater } from 'async-dispatcher';
 
 /**
  * See static method Dispatcher.createDispatcher(...)
  */
-export function createDispatcher(initialStores: {[key: string]: Store<any>}): Dispatcher {
+export function createDispatcher(initialStores: {[key: string]: Store<any> | Updater<any> | Object }): Dispatcher {
   return Dispatcher.createDispatcher(initialStores);
 }
 
