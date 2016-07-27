@@ -4,6 +4,10 @@
   "description": "A redux style dispatcher that has built in support for async updates.",
   "author": "Nick Heyn <nick@heyn.io>",
   "main": "./lib/index.js",
+  "repository" : {
+    "type" : "git",
+    "url" : "https://github.com/nheyn/async-dispatcher"
+  },
   "dependencies": {
     "immutable": "^3.7.6",
     "node-uuid": "^1.4.7"
