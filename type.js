@@ -1,6 +1,6 @@
 declare module 'async-dispatcher' {
   declare type ActionData = {[key: string]: ActionData} | Array<ActionData> | string | number | bool;
-  declare type Action = {[key: string]: ActionData};
+  declare type Action = {[key: string]: ?ActionData};
 
   declare type Subscriber<S> = (state: S) => void;
   declare type UnsubscibeFunc = () => void;
