@@ -33,7 +33,7 @@
     "test": "npm run flow && npm run jest",
     "build": "npm run babel",
 
-    "SKIP-prepublish": "npm run test && npm run build"
+    "prepublish": "npm run test && npm run build"
   },
   "jest": {
     "unmockedModulePathPatterns": [
