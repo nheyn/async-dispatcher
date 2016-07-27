@@ -1,6 +1,6 @@
 {
   "name": "async-dispatcher",
-  "version": "0.0.1-rc1",
+  "version": "0.1.0-rc",
   "description": "A redux style dispatcher that has built in support for async updates.",
   "author": "Nick Heyn <nick@heyn.io>",
   "main": "./lib/index.js",
