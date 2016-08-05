@@ -9,23 +9,11 @@ type Props = {
   onAddItem: () => void,
 };
 
-export default class NewItem extends React.Component {
-  props: Props;
-
-  onAddClicked() {
-    const { label, onAddItem } = this.props;
-
-    onAddItem(label);
-  }
-
-  render(): React.Element {
-    const { label, onUpdateNewItem, onAddItem } = this.props;
-
-    return (
-      <div>
-        <input type="text" value={label} onChange={({ target }) => onUpdateNewItem(target.value)} />
-        <button onClick={() => onAddItem()}>Add</button>
-      </div>
-    );
-  }
+export default function NewItem({ label, onUpdateNewItem, onAddItem }: Props): React.Element<*> {
+  return (
+    <div>
+      <input type="text" value={label} onChange={({ target }) => onUpdateNewItem(target.value)} />
+      <button onClick={() => onAddItem()}>Add</button>
+    </div>
+  );
 }

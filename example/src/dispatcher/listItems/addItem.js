@@ -9,15 +9,29 @@ export const LIST_ITEM_ADD = 'LIST_ITEM_ADD';
 export default function addItem(
   state: Array<ListItemState>,
   action: Action,
-  { dispatch }: Object
-): Array<ListItemState> {
+  { pause }: Object
+): Promise<Array<ListItemState>> | Array<ListItemState> {
   if(action.type !== LIST_ITEM_ADD) return state;
   if(!action.label || typeof action.label !== 'string') {
     throw new Error(`listItem updater, ${LIST_ITEM_ADD}, requires a label that is a string`);
   }
 
-  return [
-    ...state,
-    { id: state.length, label: action.label, isChecked: false }
-  ];
+  const updatedStatePromise = asyncAddItem(state, action.label);
+
+  return pause(updatedStatePromise).then((stateAfterPause) => {
+    console.log({ stateAfterPause });
+
+    return stateAfterPause;
+  });
+}
+
+function asyncAddItem(state: Array<ListItemState>, label: string): Promise<Array<ListItemState>> {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve([
+        ...state,
+        { id: state.length, label, isChecked: false }
+      ]);
+    }, 500);
+  });
 }

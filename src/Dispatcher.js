@@ -156,7 +156,7 @@ export default class Dispatcher {
     this._dispatchQueue = queue;
 
     // Perform dispatch on current stores
-    const finishedDispatchPromise = dispatchFunc(this._stores)
+    const finishedDispatchPromise = dispatchFunc(this._stores);
 
     // Start next dispatch if there are actions left in the queue
     finishedDispatchPromise.catch((err) => {
