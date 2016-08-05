@@ -229,7 +229,8 @@ export default class Dispatcher {
       createDispatchMiddleware((storeName, state, nextAction) => {
           this._setStoreState(storeName, state);
 
-          return this.dispatch(nextAction);
+          // Perform dispatch and return the current states name
+          return this.dispatch(nextAction).then(() => this.getStateFor(storeName));
       })
     ]);
   }

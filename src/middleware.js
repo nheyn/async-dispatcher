@@ -11,7 +11,7 @@ type PauseMiddlewareSpec<S> = {
   rejectDispatch: (err: Error, action: Action) => void,
   pauseError: Error
 };
-type DispatchWithState<S> = (storeName: string, state: S, action: Action) => Promise<Dispatcher>;
+type DispatchWithState<S> = (storeName: string, state: S, action: Action) => Promise<S>;
 
 /**
  * Create a middleware that adds 'getStoreName()' to plugins.
@@ -72,12 +72,10 @@ export function createPauseMiddleware<S>(spec: PauseMiddlewareSpec<S>): Middlewa
     if(!PausePromise.isPausePromise(nextStatePromise)) return nextStatePromise;
 
     // $FlowSkip
-    const pausedStatePromise: PausePromise = nextStatePromise;
+    const stateAfterPausePromise: Promise<S> = nextStatePromise.waitFor();
 
     // Return pause error while waiting for pause value
-    pausedStatePromise.waitFor().then((stateAfterPause) => {
-      console.log({ stateAfterPause });
-
+    stateAfterPausePromise.then((stateAfterPause) => {
       restartDispatch(storeName, stateAfterPause, action, pausedIndex + 1);
     }).catch((err) => {
       rejectDispatch(err, action);
@@ -98,16 +96,16 @@ export function createDispatchMiddleware<S>(dispatchWithState: DispatchWithState
     if(typeof plugins.pause !== 'function')           throw new Error('dispatch requires pause middleware');
     if(typeof plugins.getStoreName !== 'function') throw new Error('getCurrentState requires getStoreName plugin');
 
+    const storeName = plugins.getStoreName();
+
     //Add plugin
     plugins.dispatch = (updatedStateMaybePromise, action) => {
       const dispatchPromise = Promise.resolve(updatedStateMaybePromise).then((updatedState) => {
-        const storeName = plugins.getStoreName();
-
-        return dispatchWithState(storeName, updatedState, action)
+        return dispatchWithState(storeName, updatedState, action);
       });
 
       // Pause this dispatch until the action has been dispatched
-      return plugins.pause(dispatchPromise).then(() => plugins.getCurrentState());
+      return plugins.pause(dispatchPromise);
     };
 
     return next(state, action, plugins);

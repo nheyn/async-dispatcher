@@ -3,7 +3,7 @@
  */
 import Immutable from 'immutable';
 
-type PromiseFunc<I, F> = {
+type PromiseFuncs<I, F> = {
   thenFunc?: (value: I) => F | Promise<F>,
   catchFunc?: (err: Error) => F | Promise<F>
 };
@@ -16,9 +16,9 @@ type PromiseFunc<I, F> = {
 export default class PausePromise {
   isPausePromise: bool;
   _promise: Promise<any>;
-  _promiseFuncs: Immutable.List<PromiseFunc<any, any>>;
+  _promiseFuncs: Immutable.List<PromiseFuncs<any, any>>;
 
-  constructor(promise: Promise<any>, promiseFuncs: Immutable.List<PromiseFunc<any, any>>) {
+  constructor(promise: Promise<any>, promiseFuncs: Immutable.List<PromiseFuncs<any, any>>) {
     this.isPausePromise = true;
 
     this._promise = promise;
@@ -35,7 +35,8 @@ export default class PausePromise {
 
   waitFor(): Promise<any> {
     return this._promiseFuncs.reduce((currPromise, { thenFunc, catchFunc }) => {
-      return currPromise.then(thenFunc, catchFunc);
+      if(thenFunc)    return currPromise.then(thenFunc, catchFunc);
+      else            return currPromise.catch(catchFunc);
     }, this._promise);
   }
 

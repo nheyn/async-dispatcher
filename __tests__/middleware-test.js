@@ -139,11 +139,147 @@ describe('middleware', () => {
       });
     });
 
-    it('', () => {
-      //TODO, how to test pause
-      // Test Data
+    describe('pause(...) plugin', () => {
+      pit('is added to the plugins object', () => {
+        // Test Data
+        const plugins = {
+          getUpdaterIndex: () => 0,
+          getStoreName: () => 'storeName'
+        };
+        const middleware = createPauseMiddleware({
+          restartDispatch: jest.fn(),
+          rejectDispatch: jest.fn(),
+          pauseError: new Error()
+        });
 
-      // Perform Test
+        // Perform Test
+        middleware({}, {}, plugins, (state, action, { pause }) => {
+          expect(pause).toBeDefined();
+
+          return state;
+        });
+      });
+
+      pit('will throw the given pauseError if it is used', () => {
+        // Test Data
+        const pauseError = new Error();
+        const plugins = {
+          getUpdaterIndex: () => 0,
+          getStoreName: () => 'storeName'
+        };
+        const middleware = createPauseMiddleware({
+          restartDispatch: jest.fn(),
+          rejectDispatch: jest.fn(),
+          pauseError
+        });
+
+        // Perform Test
+        const dispatchPromise = middleware({}, {}, plugins, (state, action, { pause }) => {
+          return pause(Promise.resolve(state));
+        });
+
+        return dispatchPromise.then((state) => {
+          expect('not').toBe('called');
+        }).catch((err) => {
+          expect(err).toBe(pauseError);
+        });
+      });
+
+      pit('will call restartDispatch after the promise given to it is resolved', () => {
+        // Test Data
+        const initialState = { data: 'initialState' };
+        const dispatchedAction = { type: 'UPDATER_ACTION'};
+        const index = 0;
+        const storeName = 'storeName';
+        const plugins = {
+          getUpdaterIndex: () => index,
+          getStoreName: () => storeName
+        };
+        const restartDispatch = jest.fn();
+        const middleware = createPauseMiddleware({
+          restartDispatch,
+          rejectDispatch: jest.fn(),
+          pauseError: new Error()
+        });
+
+        // Perform Test
+        const dispatchPromise = middleware(initialState, dispatchedAction, plugins, (state, action, { pause }) => {
+          return pause(Promise.resolve(state));
+        });
+
+        return dispatchPromise.catch((err) => null).then(() => {
+          expect(restartDispatch).toBeCalledWith(storeName, initialState, dispatchedAction, index + 1);
+        });
+      });
+
+      pit('will call rejectDispatch after the promise given to it is rejected', () => {
+        // Test Data
+        const dispatchedAction = { type: 'DISPATCHED_ACTION' };
+        const plugins = {
+          getUpdaterIndex: () => 0,
+          getStoreName: () => 'storeName'
+        };
+        const rejectDispatch = jest.fn();
+        const dispatchError = new Error();
+        const middleware = createPauseMiddleware({
+          restartDispatch: jest.fn(),
+          rejectDispatch,
+          pauseError: new Error()
+        });
+
+        // Perform Test
+        const dispatchPromise = middleware({}, dispatchedAction, plugins, (state, action, { pause }) => {
+          return pause(new Promise((resolve, reject) => {
+            reject(dispatchError);
+          }))
+        });
+
+        return dispatchPromise.catch((err) => null).then(() => {
+          expect(rejectDispatch).toBeCalledWith(dispatchError, dispatchedAction);
+        });
+      });
+
+      pit('calls all .then and .catch callbacks before restartDispatch or rejectDispatch from spec is called', () => {
+        // Test Data
+        const initialState = { data: 'initialState' };
+        const finalState = { data: 'finalState' };
+        const dispatchedAction = { type: 'DISPATCHED_ACTION' };
+        const thenError = new Error();
+        const pauseError = new Error();
+        const thenCallback = jest.fn().mockReturnValue(initialState);
+        const errorCallback = jest.fn().mockImplementation(() => { throw thenError; });
+        const catchCallback = jest.fn().mockReturnValue(finalState);
+        const plugins = {
+          getUpdaterIndex: () => 0,
+          getStoreName: () => 'storeName'
+        };
+        const middleware = createPauseMiddleware({
+          restartDispatch: jest.fn(),
+          rejectDispatch: jest.fn(),
+          pauseError,
+        });
+
+        // Perform Test
+        const waitForPromise = new Promise((resolve) => {
+          middleware(initialState, dispatchedAction, plugins, (state, action, { pause }) => {
+            const pausePromise = pause(Promise.resolve(state));
+
+            return pausePromise.then(thenCallback).then(errorCallback).catch(catchCallback).then((currState) => {
+              resolve(currState);
+              return currState;
+            });
+          }).catch((err) => {
+            expect(err).toBe(pauseError);
+          })
+        });
+
+        return waitForPromise.then((stateAfterCallbacks) => {
+          expect(stateAfterCallbacks).toBe(finalState);
+          expect(thenCallback).toBeCalledWith(initialState);
+          expect(errorCallback).toBeCalled();
+          expect(catchCallback).toBeCalledWith(thenError);
+        });
+      });
     });
   });
 
