@@ -33,7 +33,7 @@ function createUpdateStoresFunc(initialStores, returnValues = []) {
   });
 }
 
-describe('DispatchHandler', () => {
+xdescribe('DispatchHandler', () => {
   describe('dispatch(...)', () => {
     pit('calls dispatch on each store, with the given action and middleware', () => {
       // Test Data
