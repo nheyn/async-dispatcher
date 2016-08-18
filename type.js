@@ -9,11 +9,13 @@ declare module 'async-dispatcher' {
   declare type Updater<S> = (state: S, action: Action, plugins: Plugins) => S | Promise<S>;
   declare type NextUpdater<S> = (state: S, action: Action, plugins: Plugins) => Promise<S>;
   declare type Middleware<S> = (state: S, action: Action, plugins: Plugins, next: NextUpdater<S>) => Promise<S>;
+  declare type MergeStoreFunc<S> = (currState: S, newState: S, action: Action) => S | Promise<S>;
 
   declare type StoreSpec<S> = {
     initialState: S,
     updaters: Array<Updater<S>>,
-    middleware?: Array<Middleware<S>>
+    middleware?: Array<Middleware<S>>,
+    merge?: MergeStoreFunc<S>,
   };
   declare interface Store<S> {
     dispatch(action: Action): Promise<Store<S>>;

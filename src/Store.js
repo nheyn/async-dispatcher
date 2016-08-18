@@ -4,6 +4,7 @@
 import Immutable from 'immutable';
 
 import { createDispatchForStore } from './dispatch';
+import { createPauseWithMergeMiddleware } from './middleware';
 
 import type { Action, Middleware, StoreSpec, Updater } from 'async-dispatcher';
 import type { StoreDispatch } from './dispatch/types';
@@ -55,18 +56,24 @@ export default class Store<S> {
    *          initialState  {any}               The initial state of the store
    *          updaters      {Array<Updater>}    The updaters that can mutate the Store
    *          middleware    {Array<Middleware>} The middleware functions to use
+   *          merge         {Function}          A function that will merge two states
    *        }
    *
    * @return                {Store}             The new Store
    */
-  static createStore({ initialState, updaters, middleware }: StoreSpec<S>): Store<S> {
+  static createStore({ initialState, updaters, middleware, merge }: StoreSpec<S>): Store<S> {
     if(initialState === 'undefined')              throw new Error('An initialState is required to create a Store');
     if(!Array.isArray(updaters))                  throw new Error('An array of updaters is required to create a Store');
     if(middleware && !Array.isArray(middleware))  throw new Error('Middleware must be an array when creating a Store');
 
-    const middlewareList = Immutable.List(middleware);
     const updaterList = Immutable.List(updaters);
     const dispatch = createDispatchForStore(updaterList)
+
+    let middlewareList = Immutable.List(middleware);
+    if(typeof merge === 'function') {
+      const pauseWithMergeMiddleware = createPauseWithMergeMiddleware(merge);
+      middlewareList = middlewareList.unshift(pauseWithMergeMiddleware);
+    }
 
     return new Store(initialState, middlewareList, dispatch);
   }
@@ -104,8 +111,11 @@ export default class Store<S> {
   dispatch(action: Action, middleware?: MiddlewareList<S>): Promise<Store<S>> {
     if(!action || typeof action !== 'object') throw new Error('actions must be objects');
 
+    // Combine all middleware
+    const middlewareList = middleware? middleware.concat(this._middleware): this._middleware;
+
     // Perform dispatch
-    const updatedStatePromise = this._dispatch(this._state, action, this._middleware.concat(middleware));
+    const updatedStatePromise = this._dispatch(this._state, action, middlewareList);
 
     // Create new Store from the new state
     return updatedStatePromise.then((updatedState) => {

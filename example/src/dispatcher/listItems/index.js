@@ -30,4 +30,10 @@ export default createStore({
   middleware: [
     logMiddleware,
   ],
+  merge(currStoreState, updatedState) {
+    return updatedState.map((item, index) => {
+      if(index >= currStoreState.length)  return item;
+      else                                return currStoreState[index];
+    });
+  },
 });

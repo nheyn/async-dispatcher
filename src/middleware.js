@@ -1,7 +1,7 @@
 /*
  * @flow
  */
-import type { Action, Middleware } from 'async-dispatcher';
+import type { Action, MergeStoreFunc, Middleware } from 'async-dispatcher';
 import type Dispatcher from './Dispatcher';
 
 export type PausePoint = { pausePromise: Promise<any>, index: number };
@@ -81,13 +81,26 @@ export function createPauseMiddleware<S>(onPause: OnPauseFunc): Middleware {
 /**
  *
  */
-export function createPauseWithMergeMiddleware(): Middleware {
+export function createPauseWithMergeMiddleware(mergeFunc: MergeStoreFunc): Middleware {
   return (state, action, plugins, next) => {
-    if(typeof plugins.pause !== 'function') throw new Error('pauseWithMerge requires pause plugin');
+    if(typeof plugins.pause !== 'function') {
+      console.log({ plugins });
+      throw new Error('pauseWithMerge requires pause plugin');
+    }
     if(typeof plugins.getCurrentState !== 'function') throw new Error('pauseWithMerge requires pause getCurrentState');
 
-    plugins.pauseWithMerge = (promise, mergeFunc) => {
-      return plugins.pause(promise).then((stateAfterPause) => mergeFunc(stateAfterPause, plugins.getCurrentState()));
+    // Replace pause with function that merges
+    const { pause } = plugins;
+    plugins.pause = (promise) => {
+      return pause(promise).then((stateAfterPause) => {
+        const currState = plugins.getCurrentState();
+
+        // Skip merge if is not needed
+        if(currState === state)           return stateAfterPause;
+        if(currState === stateAfterPause) return stateAfterPause;
+
+        return mergeFunc(currState, stateAfterPause, action);
+      });
     };
 
     return next(state, action, plugins);
