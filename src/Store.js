@@ -16,17 +16,19 @@ type MiddlewareList<S> = Immutable.List<Middleware<S>>;
  */
 export default class Store<S> {
   _state: S;
+  _middleware: MiddlewareList<S>;
   _dispatch: StoreDispatch;
 
   /**
    * Store constuctor (use Store.createStore).
    *
    * @param state       {any}               The current state of the object
-   * @param updaters    {List<Updater>}     The updaters that can mutate the Store
    * @param middleware  {List<Middleware>}  The middleware functions to use
+   * @param dispatch    {Function}          A function that will perform the dispatch for the store
    */
-  constructor(state: S, dispatch: StoreDispatch) {
+  constructor(state: S, middleware: MiddlewareList<S>, dispatch: StoreDispatch) {
     this._state = state;
+    this._middleware = middleware;
     this._dispatch = dispatch;
   }
 
@@ -62,18 +64,18 @@ export default class Store<S> {
     if(!Array.isArray(updaters))                  throw new Error('An array of updaters is required to create a Store');
     if(middleware && !Array.isArray(middleware))  throw new Error('Middleware must be an array when creating a Store');
 
-    const updaterList = Immutable.List(updaters);
     const middlewareList = Immutable.List(middleware);
-    const dispatch = createDispatchForStore(updaterList, middlewareList)
+    const updaterList = Immutable.List(updaters);
+    const dispatch = createDispatchForStore(updaterList)
 
-    return new Store(initialState, dispatch);
+    return new Store(initialState, middlewareList, dispatch);
   }
 
   /**
    *
    */
   static createStaticStore(state: S): Store<S> {
-    return new Store(state, () => Promise.resolve(state));
+    return new Store(state, Immutable.List(), () => Promise.resolve(state));
   }
 
   /**
@@ -86,7 +88,7 @@ export default class Store<S> {
     const reducerList = Immutable.List([ reducer ]);
     const dispatch = createDispatchForStore(reducerList, Immutable.List());
 
-    return new Store(initialState, dispatch);
+    return new Store(initialState, Immutable.List(), dispatch);
   }
 
   /**
@@ -103,7 +105,7 @@ export default class Store<S> {
     if(!action || typeof action !== 'object') throw new Error('actions must be objects');
 
     // Perform dispatch
-    const updatedStatePromise = this._dispatch(this._state, action, middleware);
+    const updatedStatePromise = this._dispatch(this._state, action, this._middleware.concat(middleware));
 
     // Create new Store from the new state
     return updatedStatePromise.then((updatedState) => {
@@ -125,7 +127,7 @@ export default class Store<S> {
     // Return 'this' if the state has not changed
     if(this._state === newState) return this;
 
-    return new Store(newState, this._dispatch);
+    return new Store(newState, this._middleware, this._dispatch);
   }
 
   /**

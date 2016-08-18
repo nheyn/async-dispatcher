@@ -14,28 +14,23 @@ type CombinedUpdater<S> = (state: S, action: Action) => Promise<S>;
  */
 export default class StoreDispatchHandler<S> {
   _updaters: UpdaterList<S>;
-  _middleware: MiddlewareList<S>;
 
   /**
    * StoreDispatchHandler constructor.
    *
-   * @param action      {List<Updater>}     The action that is being dispatched
-   * @param middleware  {List<Middleware>}  The middleware to use during the dispatch
    */
-  constructor(updaters: UpdaterList<S>, middleware: MiddlewareList<S>) {
+  constructor(updaters: UpdaterList<S>) {
     this._updaters = updaters;
-    this._middleware = middleware;
   }
 
   /**
    * Create a new StoreDispatchHandler.
    *
-   * @param middleware  {List<Middleware>}  The middleware to use during the dispatch
    *
-   * @return            {StoreDispatchHandler}     The dispatch for the given action
+   * @return            {StoreDispatchHandler}  The dispatch for the given action
    */
-  static createDispatchHandler(updaters: UpdaterList<S>, middleware?: MiddlewareList<S>): StoreDispatchHandler {
-    return new StoreDispatchHandler(updaters, middleware? middleware: Immutable.List());
+  static createDispatchHandler(updaters: UpdaterList<S>): StoreDispatchHandler {
+    return new StoreDispatchHandler(updaters);
   }
 
   /**
@@ -43,28 +38,34 @@ export default class StoreDispatchHandler<S> {
    *
    * @param state       {any}               The initial state
    * @param action      {List<Updater>}     The action that is being dispatched
+   * @param middleware  {List<Middleware>}  THe middleware to use for this dispatch
    */
-  dispatch(state: S, action: Action): Promise<S> {
+  dispatch(state: S, action: Action, middleware: MiddlewareList<S>): Promise<S> {
     const { size } = this._updaters;
     if(size === 0) return Promise.resolve(state);
 
     // Go through each updater
     return asyncReduce(this._updaters, (currState, updater, index) => {
-      const dispatch = this._createDispatchFunc(updater, index, size);
+      const dispatch = createDispatchFunc(updater, index, size, middleware);
 
-      // Perform Dispatch
+      // $FlowIssue - currState can NOT be a promise, but flow thinks it is
       return dispatch(currState, action);
     }, state);
   }
+}
 
-  _createDispatchFunc(updater: Updater<S>, updaterIndex: number, updaterCount: number): CombinedUpdater<S> {
-    return combineMiddleware(this._middleware, updater, {
-      getUpdaterIndex() {
-        return updaterIndex;
-      },
-      getUpdaterCount() {
-        return updaterCount;
-      },
-    });
-  }
+function createDispatchFunc<S>(
+  updater: Updater<S>,
+  updaterIndex: number,
+  updaterCount: number,
+  middleware: MiddlewareList<S>
+): CombinedUpdater<S> {
+  return combineMiddleware(middleware, updater, {
+    getUpdaterIndex() {
+      return updaterIndex;
+    },
+    getUpdaterCount() {
+      return updaterCount;
+    },
+  });
 }

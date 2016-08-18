@@ -11,5 +11,5 @@ export type PausePointMap = Immutable.Map<string, PausePoint>;
 
 export type UpdateStoresFunc = (stores: StoresMap) => StoresMap | Promise<StoresMap>;
 export type DispatcherDispatch = (action: Action) => Promise<StoresMap>;
-export type StoreDispatch<S> = (state: S, action: Action, middleware?: MiddlewareList<S>) => Promise<S>;
+export type StoreDispatch<S> = (state: S, action: Action, middleware: MiddlewareList<S>) => Promise<S>;
 

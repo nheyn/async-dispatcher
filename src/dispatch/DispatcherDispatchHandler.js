@@ -27,41 +27,37 @@ type StoreWithPause = {
  * A class that keeps track of all the information for a Dispatcher's dispatch.
  */
 export default class DispatcherDispatchHandler {
-  _action: Action;
   _middleware: MiddlewareList;
 
   /**
    * DispatcherDispatchHandler constructor.
    *
-   * @param action      {Action}            The action that is being dispatched
    * @param middleware  {List<Middleware>}  The middleware to use during the dispatch
    */
-  constructor(action: Action, middleware: MiddlewareList) {
-    this._action = action;
+  constructor(middleware: MiddlewareList) {
     this._middleware = middleware;
   }
 
   /**
    * Create a new DispatcherDispatchHandler.
-   *
-   * @param action      {Action}              The action that is being dispatched
-   * @param middleware  {List<Middleware>}    The middleware to use during the dispatch
+   * @param middleware  {List<Middleware>}           The middleware to use during the dispatch
    *
    * @return            {DispatcherDispatchHandler}  The dispatch for the given action
    */
-  static createDispatchHandler(action: Action, middleware?: MiddlewareList): DispatcherDispatchHandler {
-    return new DispatcherDispatchHandler(action, middleware? middleware: Immutable.List());
+  static createDispatchHandler(middleware?: MiddlewareList): DispatcherDispatchHandler {
+    return new DispatcherDispatchHandler(middleware? middleware: Immutable.List());
   }
 
   /**
    * Perform the dispatch using the given stores.
    *
    * @param stores              {Map<Store>}        The stores to dispatch to
+   * @param action              {Action}            The action that is being dispatched
    * @param initialPausePoints  {[Map<PausePoint>]} If given, the location to start the given stores
    *
    * @return                    {Object}            The updated stores, along with any pauses that occurred
    */
-  dispatch(stores: StoresMap, initialPausePoints?: PausePointMap): Promise<StoresWithPauses> {
+  dispatch(stores: StoresMap, action: Action, initialPausePoints?: PausePointMap): Promise<StoresWithPauses> {
     // Keep track of stores that paused
     let pausePoints = Immutable.Map();
 
@@ -75,7 +71,7 @@ export default class DispatcherDispatchHandler {
       }
 
       // Preform dispatch
-      const dispatchPromise = this._dispatchStore(store, storeName, pausePoint)
+      const dispatchPromise = this._dispatchStore(store, action, storeName, pausePoint)
 
       // Track this store if pause was used
       return dispatchPromise.then(({ pausePoint, updatedStore }) => {
@@ -94,7 +90,12 @@ export default class DispatcherDispatchHandler {
     });
   }
 
-  _dispatchStore(store: Store<any>, storeName: string, initialPausePoint?: ?PausePoint): Promise<StoreWithPause> {
+  _dispatchStore(
+    store: Store<any>,
+    action: Action,
+    storeName: string,
+    initialPausePoint?: ?PausePoint
+  ): Promise<StoreWithPause> {
     // Add middleware
     let pausePoint = null;
     const pauseMiddleware = createPauseMiddleware((currPausePoint) => { pausePoint = currPausePoint; });
@@ -108,7 +109,7 @@ export default class DispatcherDispatchHandler {
     if(pausePointMiddleware) middleware = middleware.unshift(pausePointMiddleware);
 
     // Perform dispatch
-    let updatedStorePromise = store.dispatch(this._action, middleware);
+    let updatedStorePromise = store.dispatch(action, middleware);
 
     // Return the initial store, if waiting for pause
     updatedStorePromise = updatedStorePromise.catch((err) => {

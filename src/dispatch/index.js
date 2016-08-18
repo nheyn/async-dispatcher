@@ -2,6 +2,7 @@
 import DispatcherDispatchHandler from './DispatcherDispatchHandler';
 import StoreDispatchHandler from './StoreDispatchHandler';
 
+import type { Action } from 'async-dispatcher';
 import type {
   UpdaterList,
   MiddlewareList,
@@ -22,28 +23,27 @@ export function createDispatchForDispatcher(
   middleware: MiddlewareList<any>,
   updateStores: WrappedUpdateStoresFunc,
 ): DispatcherDispatch {
-  return (action) => {
-    const dispatchHandler = DispatcherDispatchHandler.createDispatchHandler(action, middleware);
+  const dispatchHandler = DispatcherDispatchHandler.createDispatchHandler(middleware);
 
-    return performDispatcherDispatch(dispatchHandler, updateStores);
-  };
+  return (action) => performDispatcherDispatch(dispatchHandler, updateStores, action);
 }
 
 function performDispatcherDispatch(
   dispatchHandler: DispatcherDispatchHandler,
   updateStores: WrappedUpdateStoresFunc,
+  action: Action,
   initialPausePoints?: PausePointMap
 ): Promise<StoresMap> {
   return new Promise((resolve) => {
     updateStores((stores) =>  {
       // Perform dispatch
-      const updatedStoresPromise = dispatchHandler.dispatch(stores, initialPausePoints);
+      const updatedStoresPromise = dispatchHandler.dispatch(stores, action, initialPausePoints);
 
       return updatedStoresPromise.then(({ pausePoints, updatedStores }) => {
         // Wait for any pause points, before resolving for this function
         resolve(
           pausePoints?
-            performDispatcherDispatch(dispatchHandler, updateStores, pausePoints):
+            performDispatcherDispatch(dispatchHandler, updateStores, action, pausePoints):
             updatedStores
         )
 
@@ -57,11 +57,8 @@ function performDispatcherDispatch(
  * Create a function that will perform a Dispatchers dispatch.
  *
  */
-export function createDispatchForStore<S>(updaters: UpdaterList<S>, middleware: MiddlewareList<S>): StoreDispatch {
-  return (state, action, extraMiddleware) => {
-    const currMiddleware = extraMiddleware? middleware.concat(extraMiddleware): middleware;
-    const dispatchHandler = StoreDispatchHandler.createDispatchHandler(updaters, currMiddleware);
+export function createDispatchForStore<S>(updaters: UpdaterList<S>): StoreDispatch {
+  const dispatchHandler = StoreDispatchHandler.createDispatchHandler(updaters);
 
-    return dispatchHandler.dispatch(state, action);
-  };
+  return (state, action, middleware) => dispatchHandler.dispatch(state, action, middleware);
 }
