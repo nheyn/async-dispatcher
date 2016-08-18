@@ -22,5 +22,5 @@ export function createStore<S>(spec: StoreSpec<S>): Store<S> {
 
 export default {
   createDispatcher,
-  createStore
+  createStore,
 };

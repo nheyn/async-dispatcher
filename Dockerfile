@@ -23,6 +23,7 @@ RUN chown -R node:node ./*
 # Run tests
 USER node
 RUN npm install
+#CMD npm run test
 
 # Start example
 WORKDIR /home/node/async-dispatcher/example/

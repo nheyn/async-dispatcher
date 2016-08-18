@@ -9,8 +9,7 @@
     "url" : "https://github.com/nheyn/async-dispatcher"
   },
   "dependencies": {
-    "immutable": "^3.7.6",
-    "node-uuid": "^1.4.7"
+    "immutable": "^3.7.6"
   },
   "devDependencies": {
     "babel-cli": "^6.9.0",

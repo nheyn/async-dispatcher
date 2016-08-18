@@ -1,7 +1,12 @@
 /* @flow */
 import Immutable from 'immutable';
 
-import { createGetStoreNameMiddleware, createPauseMiddleware, createPausePointMiddlware } from '../middleware';
+import {
+  createGetStoreNameMiddleware,
+  createPauseMiddleware,
+  createPauseWithMergeMiddleware,
+  createPausePointMiddlware,
+} from '../middleware';
 import mapOfPromisesToMapPromise from '../utils/mapOfPromisesToMapPromise';
 
 import type { Action } from 'async-dispatcher';
@@ -93,12 +98,13 @@ export default class DispatcherDispatchHandler {
     // Add middleware
     let pausePoint = null;
     const pauseMiddleware = createPauseMiddleware((currPausePoint) => { pausePoint = currPausePoint; });
+    const pauseWithMergeMiddleware = createPauseWithMergeMiddleware();
     const getStoreNameMiddleware = createGetStoreNameMiddleware(storeName);
     const pausePointMiddleware = initialPausePoint? createPausePointMiddlware(initialPausePoint): null;
 
     let middleware = this._middleware;
-    middleware = middleware.unshift(pauseMiddleware);
-    middleware = middleware.unshift(getStoreNameMiddleware);
+    middleware = middleware.unshift(pauseMiddleware, getStoreNameMiddleware);
+    middleware = middleware.push(pauseWithMergeMiddleware);
     if(pausePointMiddleware) middleware = middleware.unshift(pausePointMiddleware);
 
     // Perform dispatch

@@ -1,16 +1,13 @@
 /*
  * @flow
  */
-import PausePromise from './utils/PausePromise';
-
 import type { Action, Middleware } from 'async-dispatcher';
 import type Dispatcher from './Dispatcher';
 
-type PauseMiddlewareSpec<S> = {
-  restartDispatch: (storeName: string, state: S, action: Action, startAt: number) => void,
-  rejectDispatch: (err: Error, action: Action) => void,
-  pauseError: Error
-};
+export type PausePoint = { pausePromise: Promise<any>, index: number };
+
+type GetStateFunc<S> = (storeName: string) => S;
+type OnPauseFunc = (pausePoint: PausePoint) => void;
 type DispatchWithState<S> = (storeName: string, state: S, action: Action) => Promise<S>;
 
 /**
@@ -36,13 +33,13 @@ export function createGetStoreNameMiddleware(storeName: string): Middleware {
  *
  * @return            {Middleware}  The middleware that adds the plugin function
  */
-export function createGetCurrentStateMiddleware(dispatcher: Dispatcher): Middleware {
+export function createGetCurrentStateMiddleware<S>(getStateFor: GetStateFunc<S>): Middleware {
   return (state, action, plugins, next) => {
     if(typeof plugins.getStoreName !== 'function') throw new Error('getCurrentState requires getStoreName plugin');
     const storeName = plugins.getStoreName();
 
     //Add plugin
-    plugins.getCurrentState = () => dispatcher.getStateFor(storeName);
+    plugins.getCurrentState = () => getStateFor(storeName);
 
     return next(state, action, plugins);
   };
@@ -51,37 +48,70 @@ export function createGetCurrentStateMiddleware(dispatcher: Dispatcher): Middlew
 /**
  * Create a middleware that adds 'pause()' to plugins.
  *
+ *
+ *
  * @return          {Middleware}  The middleware that adds the plugin function
  */
-export function createPauseMiddleware<S>(spec: PauseMiddlewareSpec<S>): Middleware {
+export function createPauseMiddleware<S>(onPause: OnPauseFunc): Middleware {
   return (state, action, plugins, next) => {
     if(typeof plugins.getUpdaterIndex !== 'function') throw new Error('pause requires getUpdaterIndex plugin');
-    if(typeof plugins.getStoreName !== 'function') throw new Error('getCurrentState requires getStoreName plugin');
-
-    const { restartDispatch, rejectDispatch, pauseError } = spec;
-    const pausedIndex = plugins.getUpdaterIndex();
-    const storeName = plugins.getStoreName();
 
     // Add plugin
-    plugins.pause = (promise) => PausePromise.createPausePromise(promise);
+    let hasPaused = false;
+    plugins.pause = (promise) => {
+      hasPaused = true;
+      return promise;
+    };
 
     // Call Updater
-    const nextStatePromise = next(state, action, plugins);
+    let nextStatePromise = next(state, action, plugins);;
 
-    // Return if action has not been paused
-    if(!PausePromise.isPausePromise(nextStatePromise)) return nextStatePromise;
+    // Return if action has not been paused //NOTE, pause must be called sync for this to work
+    if(!hasPaused) return nextStatePromise;
 
-    // $FlowSkip
-    const stateAfterPausePromise: Promise<S> = nextStatePromise.waitFor();
-
-    // Return pause error while waiting for pause value
-    stateAfterPausePromise.then((stateAfterPause) => {
-      restartDispatch(storeName, stateAfterPause, action, pausedIndex + 1);
-    }).catch((err) => {
-      rejectDispatch(err, action);
+    onPause({
+      pausePromise: nextStatePromise,
+      index: plugins.getUpdaterIndex(),
     });
 
-    return Promise.reject(pauseError);
+    return Promise.reject(new Error('Pause has been called - DO NOT handle this error'));
+  };
+}
+
+/**
+ *
+ */
+export function createPauseWithMergeMiddleware(): Middleware {
+  return (state, action, plugins, next) => {
+    if(typeof plugins.pause !== 'function') throw new Error('pauseWithMerge requires pause plugin');
+    if(typeof plugins.getCurrentState !== 'function') throw new Error('pauseWithMerge requires pause getCurrentState');
+
+    plugins.pauseWithMerge = (promise, mergeFunc) => {
+      return plugins.pause(promise).then((stateAfterPause) => mergeFunc(stateAfterPause, plugins.getCurrentState()));
+    };
+
+    return next(state, action, plugins);
+  };
+}
+
+/**
+ * Create a middleware that restarts after the 'pause()' plugin was called.
+ *
+ * @return          {Middleware}  The middleware that adds the plugin function
+ */
+export function createPausePointMiddlware({ pausePromise, index }: PausePoint): Middleware {
+  let hasRestarted = false;
+  return (state, action, plugins, next) => {
+    if(typeof plugins.getUpdaterIndex !== 'function') throw new Error('pause requires getUpdaterIndex plugin');
+    if(hasRestarted) return next(state, action, plugins);
+
+    const currIndex = plugins.getUpdaterIndex();
+    if(currIndex <= index) return Promise.resolve(state);
+
+    return pausePromise.then((stateAfterPause) => {
+      hasRestarted = true;
+      return next(stateAfterPause, action, plugins);
+    });
   };
 }
 
@@ -94,7 +124,7 @@ export function createDispatchMiddleware<S>(dispatchWithState: DispatchWithState
   return (state, action, plugins, next) => {
     if(typeof plugins.getCurrentState !== 'function') throw new Error('dispatch requires getCurrentState middleware');
     if(typeof plugins.pause !== 'function')           throw new Error('dispatch requires pause middleware');
-    if(typeof plugins.getStoreName !== 'function') throw new Error('getCurrentState requires getStoreName plugin');
+    if(typeof plugins.getStoreName !== 'function')    throw new Error('dispatch requires getStoreName plugin');
 
     const storeName = plugins.getStoreName();
 
@@ -105,28 +135,9 @@ export function createDispatchMiddleware<S>(dispatchWithState: DispatchWithState
       });
 
       // Pause this dispatch until the action has been dispatched
-      return plugins.pause(dispatchPromise);
+      return plugins.pause(dispatchPromise).then(() => plugins.getCurrentState());
     };
 
     return next(state, action, plugins);
-  };
-}
-
-/**
- * Created a middleware that skips the first few updaters in the given store.
- *
- * @return          {Middleware}  The middlware that skips some of the updaters
- */
-export function createSkipUpdaterMiddleware(storeName: string, startAt: number): Middleware {
-  return (state, action, plugins, next) => {
-    if(typeof plugins.getStoreName !== 'function') throw new Error('getCurrentState requires getStoreName plugin');
-    if(typeof plugins.getUpdaterIndex !== 'function') throw new Error('pause requires getUpdaterIndex plugin');
-
-    const currStoreName = plugins.getStoreName();
-    const pausedIndex = plugins.getUpdaterIndex();
-
-    if(currStoreName !== storeName) return next(state, action, plugins);
-    else if(pausedIndex >= startAt) return next(state, action, plugins);
-    else                            return Promise.resolve(state);
   };
 }

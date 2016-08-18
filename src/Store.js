@@ -3,11 +3,10 @@
  */
 import Immutable from 'immutable';
 
-import asyncReduce from './utils/asyncReduce';
-import combineMiddleware from './utils/combineMiddleware';
+import { createDispatchForStore } from './dispatch';
 
 import type { Action, Middleware, StoreSpec, Updater } from 'async-dispatcher';
-import type { CombinedUpdater } from './utils/combineMiddleware';
+import type { StoreDispatch } from './dispatch/types';
 
 type UpdaterList<S> = Immutable.List<Updater<S>>;
 type MiddlewareList<S> = Immutable.List<Middleware<S>>;
@@ -17,8 +16,7 @@ type MiddlewareList<S> = Immutable.List<Middleware<S>>;
  */
 export default class Store<S> {
   _state: S;
-  _updaters: UpdaterList<S>;
-  _middleware: MiddlewareList<S>;
+  _dispatch: StoreDispatch;
 
   /**
    * Store constuctor (use Store.createStore).
@@ -27,10 +25,25 @@ export default class Store<S> {
    * @param updaters    {List<Updater>}     The updaters that can mutate the Store
    * @param middleware  {List<Middleware>}  The middleware functions to use
    */
-  constructor(state: S, updaters: UpdaterList<S>, middleware: MiddlewareList<S>) {
+  constructor(state: S, dispatch: StoreDispatch) {
     this._state = state;
-    this._updaters = updaters;
-    this._middleware = middleware;
+    this._dispatch = dispatch;
+  }
+
+  /**
+   * Check if the given value is a store.
+   *
+   * @param maybeStore  {any} The value to check
+   *
+   * @return                  TRUE if the value is a Store, else FALSE
+   *                            NOTE: This checks the api, so the correct interface will return true
+   */
+  static isStore(maybeStore: any): bool {
+    if(typeof maybeStore.dispatch !== 'function')     return false;
+    if(typeof maybeStore.replaceState !== 'function') return false;
+    if(typeof maybeStore.getState !== 'function')     return false;
+
+    return true;
   }
 
   /**
@@ -49,41 +62,31 @@ export default class Store<S> {
     if(!Array.isArray(updaters))                  throw new Error('An array of updaters is required to create a Store');
     if(middleware && !Array.isArray(middleware))  throw new Error('Middleware must be an array when creating a Store');
 
-    return new Store(initialState, Immutable.List(updaters), Immutable.List(middleware? middleware: []));
-  }
+    const updaterList = Immutable.List(updaters);
+    const middlewareList = Immutable.List(middleware);
+    const dispatch = createDispatchForStore(updaterList, middlewareList)
 
-  /**
-   *
-   */
-  static isStore(maybeStore: any): bool {
-    if(typeof maybeStore.dispatch !== 'function')     return false;
-    if(typeof maybeStore.replaceState !== 'function') return false;
-    if(typeof maybeStore.getState !== 'function')     return false;
-
-    return true;
+    return new Store(initialState, dispatch);
   }
 
   /**
    *
    */
   static createStaticStore(state: S): Store<S> {
-    return Store.createStore({
-      initialState: state,
-      updaters: [],
-    });
+    return new Store(state, () => Promise.resolve(state));
   }
 
   /**
    *
    */
   static createReduxStore(reducer: Updater<S>): Store<S> {
-    // $FlowSkip - The 1st arg is undefined to get redux style initial state
+    // $FlowIssue - To get redux style initial state
     const initialState = reducer(undefined, { type: '@@async-dispatcher/INIT' });
 
-    return Store.createStore({
-      initialState,
-      updaters: [ reducer ],
-    });
+    const reducerList = Immutable.List([ reducer ]);
+    const dispatch = createDispatchForStore(reducerList, Immutable.List());
+
+    return new Store(initialState, dispatch);
   }
 
   /**
@@ -99,13 +102,10 @@ export default class Store<S> {
   dispatch(action: Action, middleware?: MiddlewareList<S>): Promise<Store<S>> {
     if(!action || typeof action !== 'object') throw new Error('actions must be objects');
 
-    // Get all middleware for current dispatch
-    const currMiddleware = middleware? middleware.concat(this._middleware): this._middleware;
-
     // Perform dispatch
-    const updatedStatePromise = dispatch(this._state, action, this._updaters, currMiddleware);
+    const updatedStatePromise = this._dispatch(this._state, action, middleware);
 
-    // Create new store from the new state
+    // Create new Store from the new state
     return updatedStatePromise.then((updatedState) => {
       // Check for valid state
       if(typeof updatedState === 'undefined') throw new Error('a state must be returned from each updater');
@@ -125,7 +125,7 @@ export default class Store<S> {
     // Return 'this' if the state has not changed
     if(this._state === newState) return this;
 
-    return new Store(newState, this._updaters, this._middleware);
+    return new Store(newState, this._dispatch);
   }
 
   /**
@@ -136,34 +136,4 @@ export default class Store<S> {
   getState(): S {
     return this._state;
   }
-}
-
-/**
- * Perform a dispatch using the given updaters.
- *
- * @param state       {any}               The initial state to send through the updaters
- * @param action      {Action}            The action to pass to the updaters
- * @param updater     {List<Updaters>}    The updaters to call
- * @param middleware  {List<Middleware>}  The middleware to use
- *
- * @return            {Promise<any>}      The updated state in a Promise
- */
-function dispatch<S>(state: S, action: Action, updaters: UpdaterList<S>, middleware: MiddlewareList<S>): Promise<S> {
-  // Go through each updater
-  return asyncReduce(updaters, (currState, updater, index) => {
-    // Built in plugins
-    const initPlugins = {
-      getUpdaterIndex() {
-        return index;
-      },
-      getUpdaterCount() {
-        return updaters.size;
-      },
-    };
-
-    // Call updater with middleware/plugins for this dispatch/updater (not sure why type is neeed ???)
-    const currUpdater: CombinedUpdater<S> = combineMiddleware(middleware, updater, initPlugins);
-
-    return currUpdater(currState, action);
-  }, state);
 }
