@@ -2,18 +2,17 @@
 import DispatcherDispatchHandler from './DispatcherDispatchHandler';
 import StoreDispatchHandler from './StoreDispatchHandler';
 
-import type Immutable from 'immutable';
-import type { Action, Middleware, Store, Updater } from 'async-dispatcher';
+import type {
+  UpdaterList,
+  MiddlewareList,
+  StoresMap,
+  PausePointMap,
+  UpdateStoresFunc,
+  DispatcherDispatch,
+  StoreDispatch,
+} from './types';
 
-type MiddlewareList<S> = Immutable.List<Middleware<S>>;
-type StoresMap = Immutable.Map<string, Store<any>>;
-type PausePoint = { };
-type PausePointList = Immutable.List<PausePoint>;
-type UpdaterList<S> = Immutable.List<Updater<S>>;
-
-export type UpdateStoresFunc = (update: (stores: StoresMap) => StoresMap | Promise<StoresMap>) => Promise<StoresMap>;
-export type DispatcherDispatch = (action: Action) => Promise<StoresMap>;
-export type StoreDispatch<S> = (state: S, action: Action, middleware?: MiddlewareList<S>) => Promise<S>;
+type WrappedUpdateStoresFunc = (updater: UpdateStoresFunc) => Promise<StoresMap>;
 
 /**
  * Create a function that will perform a Dispatchers dispatch.
@@ -21,7 +20,7 @@ export type StoreDispatch<S> = (state: S, action: Action, middleware?: Middlewar
  */
 export function createDispatchForDispatcher(
   middleware: MiddlewareList<any>,
-  updateStores: UpdateStoresFunc,
+  updateStores: WrappedUpdateStoresFunc,
 ): DispatcherDispatch {
   return (action) => {
     const dispatchHandler = DispatcherDispatchHandler.createDispatchHandler(action, middleware);
@@ -32,8 +31,8 @@ export function createDispatchForDispatcher(
 
 function performDispatcherDispatch(
   dispatchHandler: DispatcherDispatchHandler,
-  updateStores: UpdateStoresFunc,
-  initialPausePoints?: PausePointList
+  updateStores: WrappedUpdateStoresFunc,
+  initialPausePoints?: PausePointMap
 ): Promise<StoresMap> {
   return new Promise((resolve) => {
     updateStores((stores) =>  {
@@ -44,7 +43,7 @@ function performDispatcherDispatch(
         // Wait for any pause points, before resolving for this function
         resolve(
           pausePoints?
-            performDispatcherDispatch(dispatchHandler, pausePoints):
+            performDispatcherDispatch(dispatchHandler, updateStores, pausePoints):
             updatedStores
         )
 

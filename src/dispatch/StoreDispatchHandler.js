@@ -4,10 +4,10 @@ import Immutable from 'immutable';
 import asyncReduce from '../utils/asyncReduce';
 import combineMiddleware from '../utils/combineMiddleware';
 
-import type { Action, Middleware, Updater } from 'async-dispatcher';
+import type { Action, Updater } from 'async-dispatcher';
+import type { UpdaterList, MiddlewareList } from './types';
 
-type UpdaterList<S> = Immutable.List<Updater<S>>;
-type MiddlewareList<S> = Immutable.List<Middleware<S>>;
+type CombinedUpdater<S> = (state: S, action: Action) => Promise<S>;
 
 /**
  * A class that keeps track of all the information for a Store's dispatch.
@@ -49,7 +49,7 @@ export default class StoreDispatchHandler<S> {
     if(size === 0) return Promise.resolve(state);
 
     // Go through each updater
-    return asyncReduce(updaters, (currState, updater, index) => {
+    return asyncReduce(this._updaters, (currState, updater, index) => {
       const dispatch = this._createDispatchFunc(updater, index, size);
 
       // Perform Dispatch

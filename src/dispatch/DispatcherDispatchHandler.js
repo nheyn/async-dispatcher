@@ -1,15 +1,21 @@
 /* @flow */
 import Immutable from 'immutable';
 
-import { createGetStoreNameMiddleware, createPauseMiddleware, createPausePointMiddlware } from './middleware';
-import mapOfPromisesToMapPromise from './utils/mapOfPromisesToMapPromise';
+import { createGetStoreNameMiddleware, createPauseMiddleware, createPausePointMiddlware } from '../middleware';
+import mapOfPromisesToMapPromise from '../utils/mapOfPromisesToMapPromise';
 
-import type { Action, Middleware } from 'async-dispatcher';
+import type { Action } from 'async-dispatcher';
+import type Store from '../Store';
+import type { PausePoint } from '../middleware';
+import type { MiddlewareList, StoresMap, PausePointMap } from './types';
 
-type MiddlewareList = Immutable.List<Middleware<any>>;
 type StoresWithPauses = {
   updatedStores: StoresMap,
-  pausePoints: Immutable.Map<string, *>,
+  pausePoints?: ?PausePointMap,
+};
+type StoreWithPause = {
+  updatedStore: Store<any>,
+  pausePoint?: ?PausePoint,
 };
 
 /**
@@ -50,14 +56,12 @@ export default class DispatcherDispatchHandler {
    *
    * @return                    {Object}            The updated stores, along with any pauses that occurred
    */
-  dispatch(stores: StoresMap, initialPausePoints?: PausePoints): Promise<StoresWithPauses> {
-    // Dispatch to all stores, unless there are pause then only dispatch to the paused stores
-    let currStores = initialPausePoints? stores.filter((_, storeName) => initialPausePoints.has(storeName));
-
+  dispatch(stores: StoresMap, initialPausePoints?: PausePointMap): Promise<StoresWithPauses> {
     // Keep track of stores that paused
     let pausePoints = Immutable.Map();
 
-    // Go through each store
+    // Go through each store, unless there are pause then only dispatch to the paused stores
+    const currStores = stores.filter((_, storeName) => !initialPausePoints || initialPausePoints.has(storeName));
     const updatedStorePromises = currStores.map((store, storeName) => {
       // Start at correct updater w/ state after pause
       let pausePoint = null;
@@ -66,26 +70,26 @@ export default class DispatcherDispatchHandler {
       }
 
       // Preform dispatch
-      const dispatchPromise = this._dispatchStore(currStores, storeName, pausePoint)
+      const dispatchPromise = this._dispatchStore(store, storeName, pausePoint)
 
       // Track this store if pause was used
-      return dispatchPromise.then({ pausePoint, updatedStore }) => {
+      return dispatchPromise.then(({ pausePoint, updatedStore }) => {
         if(pausePoint) pausePoints = pausePoints.set(storeName, pausePoint);
 
         return updatedStore;
-      })
+      });
     });
 
     // Wait for all stores to finish
     return mapOfPromisesToMapPromise(updatedStorePromises).then((updatedStores) => {
       return {
-        updatedStores,
+        updatedStores: stores.merge(updatedStores),
         pausePoints: pausePoints.size > 0? pausePoints: null,
       };
     });
   }
 
-  _dispatchStore(store: Store<any>, storeName: stirng, initialPausePoint?: PausePoint): Promise<StoreWithPause> {
+  _dispatchStore(store: Store<any>, storeName: string, initialPausePoint?: ?PausePoint): Promise<StoreWithPause> {
     // Add middleware
     let pausePoint = null;
     const pauseMiddleware = createPauseMiddleware((currPausePoint) => { pausePoint = currPausePoint; });
@@ -98,7 +102,7 @@ export default class DispatcherDispatchHandler {
     if(pausePointMiddleware) middleware = middleware.unshift(pausePointMiddleware);
 
     // Perform dispatch
-    let updatedStorePromise = store.dispatch(action, middleware);
+    let updatedStorePromise = store.dispatch(this._action, middleware);
 
     // Return the initial store, if waiting for pause
     updatedStorePromise = updatedStorePromise.catch((err) => {

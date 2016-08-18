@@ -1,7 +1,7 @@
-jest.unmock('../src/DispatchHandler');
+//jest.unmock('../src/DispatchHandler');
 
 import Immutable from 'immutable';
-import DispatchHandler from '../src/DispatchHandler';
+//import DispatchHandler from '../src/DispatchHandler';
 import Store from '../src/Store';
 import { createPauseMiddleware } from '../src/middleware';
 
