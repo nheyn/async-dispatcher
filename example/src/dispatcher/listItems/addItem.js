@@ -9,7 +9,7 @@ export const LIST_ITEM_ADD = 'LIST_ITEM_ADD';
 export default function addItem(
   state: Array<ListItemState>,
   action: Action,
-  { pause }: Object
+  { pauseWithMerge }: Object
 ): Promise<Array<ListItemState>> | Array<ListItemState> {
   if(action.type !== LIST_ITEM_ADD) return state;
   if(!action.label || typeof action.label !== 'string') {
@@ -18,10 +18,14 @@ export default function addItem(
 
   const updatedStatePromise = asyncAddItem(state, action.label);
 
-  return pause(updatedStatePromise).then((stateAfterPause) => {
-    console.log({ stateAfterPause });
+  return pauseWithMerge(updatedStatePromise, (updatedState, currStoreState) => {
+    if(state === currStoreState)        return updatedState;
+    if(updatedState === currStoreState) return updatedState;
 
-    return stateAfterPause;
+    return updatedState.map((item, index) => {
+      if(index >= currStoreState.length)  return item;
+      else                                return currStoreState[index];
+    });
   });
 }
 
@@ -32,6 +36,6 @@ function asyncAddItem(state: Array<ListItemState>, label: string): Promise<Array
         ...state,
         { id: state.length, label, isChecked: false }
       ]);
-    }, 500);
+    }, 5000);
   });
 }
