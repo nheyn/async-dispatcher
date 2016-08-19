@@ -16,6 +16,7 @@ export type ListItemState = {
 
 const logMiddleware = createLogMiddleware('listItems');
 
+// $FlowIssue - Doesn't like the Promise in addItem (???)
 export default createStore({
   initialState: [
     { id: 0, label: 'Item 0', isChecked: false },

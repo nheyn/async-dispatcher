@@ -29,7 +29,7 @@ export default class StoreDispatchHandler<S> {
    *
    * @return            {StoreDispatchHandler}  The dispatch for the given action
    */
-  static createDispatchHandler(updaters: UpdaterList<S>): StoreDispatchHandler {
+  static createDispatchHandler(updaters: UpdaterList<S>): StoreDispatchHandler<S> {
     return new StoreDispatchHandler(updaters);
   }
 

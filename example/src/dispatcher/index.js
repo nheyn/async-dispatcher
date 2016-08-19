@@ -16,7 +16,7 @@ export function createTodoDispatcher(): Dispatcher {
     basicInfo: {
       title: 'Todo List',
     },
-    newItem(state = '', action) {
+    newItem(state: string = '', action: Object): string {
       if(action.type === LIST_ITEM_ADD)     return '';
       if(action.type !== NEW_ITEM_UPDATE)   return state;
       if(typeof action.label !== 'string')  return state;

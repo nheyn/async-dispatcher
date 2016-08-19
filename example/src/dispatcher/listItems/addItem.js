@@ -2,15 +2,15 @@
  * @flow
  */
 import type { Action } from 'async-dispatcher';
-import type { ListItemState } from './index';
+import type { ListItemState as Item } from './index';
 
 export const LIST_ITEM_ADD = 'LIST_ITEM_ADD';
 
 export default function addItem(
-  state: Array<ListItemState>,
+  state: Array<Item>,
   action: Action,
   { pause }: Object
-): Promise<Array<ListItemState>> | Array<ListItemState> {
+): Promise<Array<Item>> | Array<Item> {
   if(action.type !== LIST_ITEM_ADD) return state;
   if(!action.label || typeof action.label !== 'string') {
     throw new Error(`listItem updater, ${LIST_ITEM_ADD}, requires a label that is a string`);
@@ -21,7 +21,7 @@ export default function addItem(
   return pause(updatedStatePromise);
 }
 
-function asyncAddItem(state: Array<ListItemState>, label: string): Promise<Array<ListItemState>> {
+function asyncAddItem(state: Array<Item>, label: string): Promise<Array<Item>> {
   return new Promise((resolve) => {
     setTimeout(() => {
       resolve([

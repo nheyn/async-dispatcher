@@ -23,7 +23,7 @@ type Props = {
 
 export default function ItemList(
   { items, newItem, onCheck, onUncheck, onUpdateNewItem, onAddItem }: Props
-): React.Element {
+): React.Element<*> {
   return (
     <ul>
     {items.map(({ id, label, isChecked }) =>

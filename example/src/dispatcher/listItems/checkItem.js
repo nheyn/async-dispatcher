@@ -14,7 +14,7 @@ type Action = {
 export const LIST_ITEM_CHECK = 'LIST_ITEM_CHECK';
 export const LIST_ITEM_UNCHECK = 'LIST_ITEM_UNCHECK';
 
-export default function checkItem(state: Array<Item>, action: Action, { dispatch, getCurrentState }: Object): Array<Item> {
+export default function checkItem(state: Array<Item>, action: Action, { dispatch }: Object): Array<Item> {
   if(action.type !== LIST_ITEM_CHECK && action.type !== LIST_ITEM_UNCHECK) return state;
   if(typeof action.id !== 'number') throw new Error(`listItems ${action.type} requires a numeric id`);
   const { type, id } = action;

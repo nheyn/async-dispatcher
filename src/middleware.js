@@ -4,10 +4,10 @@
 import type { Action, MergeStoreFunc, Middleware } from 'async-dispatcher';
 import type Dispatcher from './Dispatcher';
 
-export type PausePoint = { pausePromise: Promise<any>, index: number };
+export type PausePoint<S> = { pausePromise: Promise<S>, index: number };
 
 type GetStateFunc<S> = (storeName: string) => S;
-type OnPauseFunc = (pausePoint: PausePoint) => void;
+type OnPauseFunc<S> = (pausePoint: PausePoint<S>) => void;
 type DispatchWithState<S> = (storeName: string, state: S, action: Action) => Promise<S>;
 
 /**
@@ -17,7 +17,7 @@ type DispatchWithState<S> = (storeName: string, state: S, action: Action) => Pro
  *
  * @return          {Middleware}  The middleware that adds the plugin function
  */
-export function createGetStoreNameMiddleware(storeName: string): Middleware {
+export function createGetStoreNameMiddleware(storeName: string): Middleware<any> {
   return (state, action, plugins, next) => {
     //Add plugin
     plugins.getStoreName = () => storeName;
@@ -33,7 +33,7 @@ export function createGetStoreNameMiddleware(storeName: string): Middleware {
  *
  * @return            {Middleware}  The middleware that adds the plugin function
  */
-export function createGetCurrentStateMiddleware<S>(getStateFor: GetStateFunc<S>): Middleware {
+export function createGetCurrentStateMiddleware<S>(getStateFor: GetStateFunc<S>): Middleware<S> {
   return (state, action, plugins, next) => {
     if(typeof plugins.getStoreName !== 'function') throw new Error('getCurrentState requires getStoreName plugin');
     const storeName = plugins.getStoreName();
@@ -52,7 +52,7 @@ export function createGetCurrentStateMiddleware<S>(getStateFor: GetStateFunc<S>)
  *
  * @return          {Middleware}  The middleware that adds the plugin function
  */
-export function createPauseMiddleware<S>(onPause: OnPauseFunc): Middleware {
+export function createPauseMiddleware<S>(onPause: OnPauseFunc<S>): Middleware<S> {
   return (state, action, plugins, next) => {
     if(typeof plugins.getUpdaterIndex !== 'function') throw new Error('pause requires getUpdaterIndex plugin');
 
@@ -81,7 +81,7 @@ export function createPauseMiddleware<S>(onPause: OnPauseFunc): Middleware {
 /**
  *
  */
-export function createPauseWithMergeMiddleware(mergeFunc: MergeStoreFunc): Middleware {
+export function createPauseWithMergeMiddleware<S>(mergeFunc: MergeStoreFunc<S>): Middleware<S> {
   return (state, action, plugins, next) => {
     if(typeof plugins.pause !== 'function') {
       console.log({ plugins });
@@ -112,7 +112,7 @@ export function createPauseWithMergeMiddleware(mergeFunc: MergeStoreFunc): Middl
  *
  * @return          {Middleware}  The middleware that adds the plugin function
  */
-export function createPausePointMiddlware({ pausePromise, index }: PausePoint): Middleware {
+export function createPausePointMiddlware<S>({ pausePromise, index }: PausePoint<S>): Middleware<any> {
   let hasRestarted = false;
   return (state, action, plugins, next) => {
     if(typeof plugins.getUpdaterIndex !== 'function') throw new Error('pause requires getUpdaterIndex plugin');
@@ -133,7 +133,7 @@ export function createPausePointMiddlware({ pausePromise, index }: PausePoint): 
  *
  * @return            {Middleware}  The middleware that adds the plugin function
  */
-export function createDispatchMiddleware<S>(dispatchWithState: DispatchWithState): Middleware {
+export function createDispatchMiddleware<S>(dispatchWithState: DispatchWithState<S>): Middleware<S> {
   return (state, action, plugins, next) => {
     if(typeof plugins.getCurrentState !== 'function') throw new Error('dispatch requires getCurrentState middleware');
     if(typeof plugins.pause !== 'function')           throw new Error('dispatch requires pause middleware');

@@ -15,21 +15,21 @@ type StoresWithPauses = {
 };
 type StoreWithPause = {
   updatedStore: Store<any>,
-  pausePoint?: ?PausePoint,
+  pausePoint?: ?PausePoint<*>,
 };
 
 /**
  * A class that keeps track of all the information for a Dispatcher's dispatch.
  */
 export default class DispatcherDispatchHandler {
-  _middleware: MiddlewareList;
+  _middleware: MiddlewareList<any>;
 
   /**
    * DispatcherDispatchHandler constructor.
    *
    * @param middleware  {List<Middleware>}  The middleware to use during the dispatch
    */
-  constructor(middleware: MiddlewareList) {
+  constructor(middleware: MiddlewareList<*>) {
     this._middleware = middleware;
   }
 
@@ -39,7 +39,7 @@ export default class DispatcherDispatchHandler {
    *
    * @return            {DispatcherDispatchHandler}  The dispatch for the given action
    */
-  static createDispatchHandler(middleware?: MiddlewareList): DispatcherDispatchHandler {
+  static createDispatchHandler(middleware?: MiddlewareList<*>): DispatcherDispatchHandler {
     return new DispatcherDispatchHandler(middleware? middleware: Immutable.List());
   }
 
@@ -89,7 +89,7 @@ export default class DispatcherDispatchHandler {
     store: Store<any>,
     action: Action,
     storeName: string,
-    initialPausePoint?: ?PausePoint
+    initialPausePoint?: ?PausePoint<*>
   ): Promise<StoreWithPause> {
     // Add middleware
     let pausePoint = null;

@@ -7,7 +7,7 @@ import type { PausePoint } from '../middleware';
 export type UpdaterList<S> = Immutable.List<Updater<S>>;
 export type MiddlewareList<S> = Immutable.List<Middleware<S>>;
 export type StoresMap = Immutable.Map<string, Store<any>>;
-export type PausePointMap = Immutable.Map<string, PausePoint>;
+export type PausePointMap = Immutable.Map<string, PausePoint<any>>;
 
 export type UpdateStoresFunc = (stores: StoresMap) => StoresMap | Promise<StoresMap>;
 export type DispatcherDispatch = (action: Action) => Promise<StoresMap>;

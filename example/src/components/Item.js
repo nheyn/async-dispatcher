@@ -9,7 +9,7 @@ type Props = {
   onCheckClicked: () => void
 };
 
-export default function Item({ label, isChecked, onCheckClicked }: Props): React.Element {
+export default function Item({ label, isChecked, onCheckClicked }: Props): React.Element<*> {
   return (
     <div>
       <input type="checkbox" checked={isChecked} onChange={onCheckClicked} />

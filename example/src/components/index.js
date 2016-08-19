@@ -89,7 +89,7 @@ export default class TodoList extends React.Component {
     });
   }
 
-  render(): React.Element {
+  render(): React.Element<*> {
     const { items, newItem, basicInfo: { title }} = this.state;
 
     return (

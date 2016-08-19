@@ -12,25 +12,24 @@ type MiddlewareList<S> = Immutable.List<Middleware<S>>;
  * Combine the current middleware together with the updater.
  */
 export default function combineMiddleware<S>(
-  middlewareList: MiddlewareList,
+  middlewareList: MiddlewareList<S>,
   updater: Updater<S>,
-  plugins: Plugins
+  plugins: Plugins,
 ): CombinedUpdater<S> {
-  const updaterForMiddleware = wrapUpdater(updater);
+  const orderedMiddleware = middlewareList.reverse();
+  const wrappedUpdater = wrapUpdater(updater);
 
   // Create an updater that calls all the middleware then the updater
-  const combinedMiddlewareUpdater = middlewareList.reverse().reduce(applyMiddleware, updaterForMiddleware);
+  const combinedMiddlewareUpdater = orderedMiddleware.reduce((nextUpdater, middleware) => {
+    const next = createNext(nextUpdater);
+
+    return (statePromise, action, plugins) => statePromise.then((state) => middleware(state, action, plugins, next));
+  }, wrappedUpdater);
 
   return injectPlugins(combinedMiddlewareUpdater, plugins);
 }
 
 // Helper funcs
-function applyMiddleware<S>(nextUpdater: MiddlewareUpdater<S>, middleware: Middleware<S>): MiddlewareUpdater<S> {
-  return (statePromise, action, plugins) => statePromise.then((state) => {
-    return middleware(state, action, plugins, createNext(nextUpdater));
-  });
-}
-
 function wrapUpdater<S>(updater: Updater<S> | NextUpdater<S>): MiddlewareUpdater<S> {
   return (statePromise, action, plugins) => statePromise.then((state) => updater(state, action, plugins));
 }

@@ -18,7 +18,7 @@ type MiddlewareList<S> = Immutable.List<Middleware<S>>;
 export default class Store<S> {
   _state: S;
   _middleware: MiddlewareList<S>;
-  _dispatch: StoreDispatch;
+  _dispatch: StoreDispatch<S>;
 
   /**
    * Store constuctor (use Store.createStore).
@@ -27,7 +27,7 @@ export default class Store<S> {
    * @param middleware  {List<Middleware>}  The middleware functions to use
    * @param dispatch    {Function}          A function that will perform the dispatch for the store
    */
-  constructor(state: S, middleware: MiddlewareList<S>, dispatch: StoreDispatch) {
+  constructor(state: S, middleware: MiddlewareList<S>, dispatch: StoreDispatch<S>) {
     this._state = state;
     this._middleware = middleware;
     this._dispatch = dispatch;

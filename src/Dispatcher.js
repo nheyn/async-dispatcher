@@ -9,7 +9,7 @@ import Queue from './utils/Queue';
 import type { Action, Middleware, Subscriber, Updater, UnsubscibeFunc } from 'async-dispatcher';
 import type { StoresMap, DispatcherDispatch, UpdateStoresFunc } from './dispatch/types';
 
-type SubscriberMap = Immutable.Map<string, Immutable.Set<Subscriber>>;
+type SubscriberMap = Immutable.Map<string, Immutable.Set<Subscriber<any>>>;
 
 export default class Dispatcher {
   _stores: StoresMap;

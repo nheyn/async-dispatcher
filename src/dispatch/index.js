@@ -57,7 +57,7 @@ function performDispatcherDispatch(
  * Create a function that will perform a Dispatchers dispatch.
  *
  */
-export function createDispatchForStore<S>(updaters: UpdaterList<S>): StoreDispatch {
+export function createDispatchForStore<S>(updaters: UpdaterList<S>): StoreDispatch<S> {
   const dispatchHandler = StoreDispatchHandler.createDispatchHandler(updaters);
 
   return (state, action, middleware) => dispatchHandler.dispatch(state, action, middleware);
