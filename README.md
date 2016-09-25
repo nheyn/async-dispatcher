@@ -32,17 +32,73 @@ Async Dispatcher is hosted on npm, and can be installed using:
 ```
 npm install --save async-dispatcher
 ```
+
 ### Usage
-*Coming Soon*
+##### Store
+Stores keep track of the state for part of an application.
+
+The state of Store can be mutated though updater functions. The function is sent the current state of the store and the action dispatched to the store. It should return the updated state, which can be in a Promise.
+```
+function updater(state, action) {
+  // Update state for action
+  //NOTE, do not mutate either argument
+
+  return state;
+});
+```
+
+Stores are created using the 'createStore' function, which takes the initial state of the Store as its argumenta.
+```
+var AsyncDispatcher = require('async-dispatcher');
+
+var store  = AsyncDispatcher.createStore({
+  initialState: {},
+  updaters: [ updater ]
+});
+```
 
 
-### Documentation
-Basic usage will be given above. More detailed documentation is before class/function definitions within the code.
+##### Dispatcher
+Dispatchers keep track of a set of Stores.
 
+Dispatchers are created using the 'createDispatcher' function, which takes a JS object with the Stores to use in the Dispatcher.
+```
+var dispatcher = AsyncDispatcher.createDispatcher({
+  storeName: store
+});
+```
+
+To update the states of the Stores use the 'dispatch' method.
+Each action passed to the Dispatcher is dispatched to all of the Stores.
+The returned value is a Promise that resolves after the given action finishes updating (resolves to the Dispatcher).
+```
+var action = { type: 'SOME_ACTION' };
+dispatcher.dispatch(action).then(function() {
+  // Perform any updates to do after the given action finishes dispatching
+});
+```
+
+To get the state of a Store use the 'getStateFor' method.
+```
+var state = dispatcher.getStateFor('storeName');
+```
+
+Use the 'subscribeTo' method to add to subscribe to the changes in a single Stores.
+The subscriber will be passed the updated state for the given Store.
+It returns a function that will, when called, unsubscribe the subscriber.
+```
+// Subscribe to 'storeName'
+var unsubscribe = dispatcher.subscribeTo('storeName', function(updatedState) {
+   // Perform updates for new state
+});
+
+// Unsubscribe from 'storeName'
+unsubscribe();
+```
 
 ### Tests
 Test are written using [jest](https://facebook.github.io/jest/). Static type checking is done use [Flowtype](http://flowtype.org).
-(__NOTE__, flow types are available by adding 'node_modules/async-dispatcher/type' to [libs] section of .flowconfig)
+(__NOTE__, flow types are available by adding 'node_modules/async-dispatcher/type.js' to [libs] section of .flowconfig)
 
 To perform static type check and the jest unit-tests, use:
 ```
@@ -61,3 +117,5 @@ npm install
 npm start
 ```
 
+### Documentation
+Basic usage is given above. More detailed documentation is before class/function definitions within the code.
