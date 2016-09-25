@@ -6,18 +6,16 @@
   "dependencies": {
     "async-dispatcher": "../../async-dispatcher",
     "http-server": "^0.9.0",
-    "react": "^15.1.0",
-    "react-dom": "^15.1.0"
+    "react": "^15.3.2",
+    "react-dom": "^15.3.2"
   },
   "devDependencies": {
     "babel-cli": "^6.9.0",
-    "babel-jest": "^12.1.0",
-    "babel-plugin-transform-flow-strip-types": "^6.8.0",
     "babel-polyfill": "^6.9.1",
     "babel-preset-es2015": "^6.9.0",
     "babel-preset-react": "^6.5.0",
     "babel-preset-stage-0": "^6.5.0",
-    "browserify": "^13.0.1"
+    "browserify": "^13.1.0"
   },
   "scripts": {
     "babel": "babel ./src/ -d ./lib/",

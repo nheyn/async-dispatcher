@@ -17,5 +17,8 @@ Store.isStore.mockReturnValue(true);
 
 describe('DispatcherDispatchHandler', () => {
   describe('dispatch(...)', () => {
+    it('does stuff (only herer so jest doesn\'t fail)', () => {
+
+    });
   });
 });
