@@ -19,60 +19,6 @@ Abstract out (and will soon be a dependency) of [isomorphic-dispatcher](https://
   * dispatch(currState, nextAction): returned from Updater dispatch an action from another updater
   * Stores can be given Middleware, to add additional plugins
 
-### Why not Redux?
-
-__TL;DR;__
-*Redux is a vary good idea, but the official implementation is too "theoretical"*
-
-* Single function
-  * Which contains
-    * Initial state
-    * Every action that can be performed
-  * but not in practice
-    * Complex initial state is moved to it own var
-    * Many actions will be spit into multiple file
-  * For each dispatcher
-    * With single state
-  * but not in practice
-    * Combined using ```Lookup redux function name```
-* No Async
-  * Why async
-    * Sync reducers can be performed async
-    * Async can not be performed sync
-  * There is a performance hit, but worth the flexibility
-* Symptoms
-  * Need a bunch of extras for simple implementation
-    * Get normal middleware / helper modules
-  * Function called a 'reducer'
-    * Know by functional programmers
-    * Doesn't make sense otherwise
-      * "How do you reduce a state"
-    * Really performs updates
-  * Action creators
-  * Link to async how-to
-    * Rediculus how long it is
-    * Show how simple it can be done
-      * Return promise, built into ES2015
-
-
-### Why async-dispatcher?
-
-__TL;DR;__
-*It is a more particle implementation of Redux*
-
-* Async built in
-  * Plug isomorphic-dispatcher
-* Initial state is given when the store is create
-  * State is separated from the updates
-    * Like any complex state would end up being
-  * Still allows synchronous access to state, and asynchronous updates
-* Multiple updaters can be added
-  * Each updater can focus on one update
-    * Like any complex set of action will end up being
-* Get State / Subscribe to proticluare store
-  * Ignore the other states, not being used
-    * Like any complex app will any way
-
 ### Dependencies
 * ES2015(ES6) Promises
   * Used to handle asynchronous events, with standard javascript
